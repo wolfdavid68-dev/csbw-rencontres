@@ -1,0 +1,438 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <link rel="icon" href="csbw-192.png">
+  <title>{{ title }} - {{ season }}</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #202124;
+      --muted: #65686d;
+      --line: #d9dade;
+      --surface: #ffffff;
+      --soft: #f4f5f6;
+      --brand: #c91424;
+      --brand-dark: #8d0f19;
+      --home: #176b55;
+      --away: #315c8c;
+      --result: #5b456f;
+      --radius: 6px;
+    }
+
+    * { box-sizing: border-box; }
+
+    html { background: transparent; }
+
+    body {
+      margin: 0;
+      background: transparent;
+      color: var(--ink);
+      font: 15px/1.45 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      letter-spacing: 0;
+    }
+
+    a { color: inherit; }
+
+    .calendar {
+      width: min(100%, 980px);
+      margin: 0 auto;
+      padding: 12px;
+    }
+
+    .calendar-header {
+      display: grid;
+      grid-template-columns: 58px minmax(0, 1fr) auto;
+      gap: 14px;
+      align-items: center;
+      padding: 0 0 16px;
+      border-bottom: 3px solid var(--brand);
+    }
+
+    .brand-mark {
+      width: 58px;
+      height: 58px;
+      object-fit: contain;
+    }
+
+    h1, h2, p { margin: 0; }
+
+    h1 {
+      font-size: clamp(1.3rem, 2vw, 1.75rem);
+      line-height: 1.2;
+      font-weight: 760;
+    }
+
+    .season {
+      margin-top: 3px;
+      color: var(--muted);
+      font-size: .9rem;
+    }
+
+    .calendar-link {
+      display: inline-flex;
+      align-items: center;
+      min-height: 38px;
+      padding: 8px 12px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--surface);
+      font-weight: 650;
+      text-decoration: none;
+      white-space: nowrap;
+    }
+
+    .calendar-link:hover,
+    .calendar-link:focus-visible {
+      border-color: var(--brand);
+      color: var(--brand-dark);
+      outline: 2px solid transparent;
+    }
+
+    .status-panel {
+      margin: 18px 0;
+      padding: 18px;
+      border-left: 4px solid var(--away);
+      background: #eef4fa;
+    }
+
+    .status-panel h2 {
+      margin-bottom: 5px;
+      font-size: 1.08rem;
+    }
+
+    .toolbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      padding: 16px 0 12px;
+    }
+
+    .filters {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+
+    .filter-button {
+      min-height: 36px;
+      padding: 7px 12px;
+      border: 0;
+      border-right: 1px solid var(--line);
+      border-radius: 0;
+      background: var(--surface);
+      color: var(--ink);
+      font: inherit;
+      font-weight: 650;
+      cursor: pointer;
+    }
+
+    .filter-button:last-child { border-right: 0; }
+
+    .filter-button[aria-pressed="true"] {
+      background: var(--ink);
+      color: #fff;
+    }
+
+    .filter-button:focus-visible {
+      position: relative;
+      z-index: 1;
+      outline: 2px solid var(--brand);
+      outline-offset: -2px;
+    }
+
+    .updated {
+      color: var(--muted);
+      font-size: .82rem;
+      text-align: right;
+    }
+
+    .section-title {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 12px;
+      margin: 12px 0 8px;
+      font-size: 1.03rem;
+    }
+
+    .count {
+      color: var(--muted);
+      font-size: .82rem;
+      font-weight: 500;
+    }
+
+    .match-list {
+      display: grid;
+      gap: 8px;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .match {
+      display: grid;
+      grid-template-columns: 92px minmax(0, 1fr) minmax(170px, .7fr);
+      gap: 14px;
+      align-items: center;
+      min-height: 92px;
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-left: 4px solid var(--away);
+      border-radius: var(--radius);
+      background: var(--surface);
+    }
+
+    .match[data-home="true"] { border-left-color: var(--home); }
+    .match[data-played="true"] { border-left-color: var(--result); }
+    .match[hidden] { display: none; }
+
+    .date {
+      align-self: stretch;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      padding-right: 12px;
+      border-right: 1px solid var(--line);
+      text-transform: capitalize;
+    }
+
+    .date strong {
+      font-size: 1rem;
+      line-height: 1.2;
+    }
+
+    .date span {
+      margin-top: 4px;
+      color: var(--brand-dark);
+      font-weight: 750;
+    }
+
+    .match-main { min-width: 0; }
+
+    .meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-bottom: 6px;
+    }
+
+    .tag {
+      display: inline-flex;
+      align-items: center;
+      min-height: 24px;
+      padding: 3px 7px;
+      border-radius: 4px;
+      background: var(--soft);
+      color: var(--muted);
+      font-size: .75rem;
+      font-weight: 700;
+    }
+
+    .tag.home { background: #e6f3ef; color: var(--home); }
+    .tag.away { background: #eaf0f7; color: var(--away); }
+
+    .fixture {
+      overflow-wrap: anywhere;
+      font-size: 1rem;
+      font-weight: 720;
+    }
+
+    .score {
+      display: inline-block;
+      margin: 0 5px;
+      color: var(--brand-dark);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .venue {
+      min-width: 0;
+      color: var(--muted);
+      font-size: .86rem;
+    }
+
+    .venue a {
+      display: block;
+      overflow-wrap: anywhere;
+      color: var(--away);
+      font-weight: 650;
+      text-decoration-thickness: 1px;
+      text-underline-offset: 2px;
+    }
+
+    .source-link {
+      display: inline-block;
+      margin-top: 6px;
+      color: var(--muted);
+      font-size: .78rem;
+    }
+
+    details.results { margin-top: 20px; }
+
+    details.results > summary {
+      padding: 10px 0;
+      border-top: 1px solid var(--line);
+      font-weight: 720;
+      cursor: pointer;
+    }
+
+    .empty-filter {
+      display: none;
+      padding: 20px 0;
+      color: var(--muted);
+      text-align: center;
+    }
+
+    .empty-filter.visible { display: block; }
+
+    @media (max-width: 680px) {
+      .calendar { padding: 8px; }
+
+      .calendar-header {
+        grid-template-columns: 46px minmax(0, 1fr);
+        gap: 10px;
+      }
+
+      .brand-mark { width: 46px; height: 46px; }
+      .calendar-link { grid-column: 1 / -1; justify-content: center; }
+      .toolbar { align-items: stretch; flex-direction: column; }
+      .updated { text-align: left; }
+      .match { grid-template-columns: 76px minmax(0, 1fr); gap: 10px; }
+      .venue { grid-column: 2; }
+      .date { padding-right: 8px; }
+    }
+
+    @media (prefers-reduced-motion: no-preference) {
+      .filter-button, .calendar-link { transition: background-color .15s ease, color .15s ease, border-color .15s ease; }
+    }
+  </style>
+</head>
+<body>
+  <main class="calendar">
+    <header class="calendar-header">
+      <img class="brand-mark" src="csbw-192.png" alt="Logo du CSBW" width="58" height="58">
+      <div>
+        <h1>{{ title }}</h1>
+        <p class="season">Saison {{ season }}</p>
+      </div>
+      <a class="calendar-link" href="calendrier.ics" download>S’abonner au calendrier</a>
+    </header>
+
+    {% if status != "ready" %}
+    <section class="status-panel" aria-live="polite">
+      {% if status == "awaiting_publication" %}
+      <h2>Calendrier bientôt disponible</h2>
+      <p>Les compétitions Grand Est et Comité 68 de la saison {{ season }} ne sont pas encore publiées sur ICbad.</p>
+      {% elif status == "awaiting_teams" %}
+      <h2>Équipes en attente d’inscription</h2>
+      <p>Les compétitions existent, mais les équipes seniors du CSBW ne sont pas encore affichées.</p>
+      {% else %}
+      <h2>Rencontres en attente</h2>
+      <p>Les équipes sont publiées. Les dates des rencontres seront ajoutées automatiquement dès leur mise en ligne.</p>
+      {% endif %}
+    </section>
+    {% endif %}
+
+    {% if total %}
+    <div class="toolbar">
+      <div class="filters" role="group" aria-label="Filtrer par équipe">
+        <button class="filter-button" type="button" data-filter="all" aria-pressed="true">Toutes</button>
+        {% for team in teams %}
+        <button class="filter-button" type="button" data-filter="{{ team }}" aria-pressed="false">{{ team }}</button>
+        {% endfor %}
+      </div>
+      <p class="updated">Mise à jour le {{ generated_label }}</p>
+    </div>
+
+    <section aria-labelledby="upcoming-title">
+      <h2 class="section-title" id="upcoming-title">
+        Prochaines rencontres
+        <span class="count">{{ upcoming|length }} à venir</span>
+      </h2>
+      <ul class="match-list" data-list="upcoming">
+        {% for match in upcoming %}
+        <li class="match" data-team="{{ match.team }}" data-home="{{ 'true' if match.is_home else 'false' }}" data-played="false">
+          <div class="date">
+            <strong>{{ match.weekday_label }} {{ match.date_label[:2] }}</strong>
+            <span>{{ match.time_label }}</span>
+          </div>
+          <div class="match-main">
+            <div class="meta">
+              <span class="tag {{ 'home' if match.is_home else 'away' }}">{{ 'Domicile' if match.is_home else 'Extérieur' }}</span>
+              <span class="tag">{{ match.team }}</span>
+              {% if match.round_number %}<span class="tag">J{{ match.round_number }}</span>{% endif %}
+            </div>
+            <p class="fixture">{{ match.home_team }} <span class="score">{{ match.score or '–' }}</span> {{ match.away_team }}</p>
+          </div>
+          <div class="venue">
+            {% if match.maps_url %}<a href="{{ match.maps_url }}" target="_blank" rel="noopener">{{ match.venue }}</a>{% else %}<span>Lieu à confirmer</span>{% endif %}
+            <a class="source-link" href="{{ match.source_url }}" target="_blank" rel="noopener">Voir sur ICbad</a>
+          </div>
+        </li>
+        {% else %}
+        <li class="status-panel">Aucune rencontre à venir pour le moment.</li>
+        {% endfor %}
+      </ul>
+    </section>
+
+    {% if past %}
+    <details class="results">
+      <summary>Résultats précédents ({{ past|length }})</summary>
+      <ul class="match-list" data-list="past">
+        {% for match in past %}
+        <li class="match" data-team="{{ match.team }}" data-home="{{ 'true' if match.is_home else 'false' }}" data-played="true">
+          <div class="date">
+            <strong>{{ match.weekday_label }} {{ match.date_label[:2] }}</strong>
+            <span>{{ match.date_label[3:] }}</span>
+          </div>
+          <div class="match-main">
+            <div class="meta">
+              <span class="tag">{{ match.team }}</span>
+              {% if match.round_number %}<span class="tag">J{{ match.round_number }}</span>{% endif %}
+            </div>
+            <p class="fixture">{{ match.home_team }} <span class="score">{{ match.score or '–' }}</span> {{ match.away_team }}</p>
+          </div>
+          <div class="venue">
+            {% if match.maps_url %}<a href="{{ match.maps_url }}" target="_blank" rel="noopener">{{ match.venue }}</a>{% endif %}
+            <a class="source-link" href="{{ match.source_url }}" target="_blank" rel="noopener">Feuille de rencontre</a>
+          </div>
+        </li>
+        {% endfor %}
+      </ul>
+    </details>
+    {% endif %}
+    <p class="empty-filter" id="empty-filter">Aucune rencontre pour cette équipe.</p>
+    {% else %}
+    <p class="updated">Vérification ICbad effectuée le {{ generated_label }}</p>
+    {% endif %}
+  </main>
+
+  <script>
+    (() => {
+      const buttons = [...document.querySelectorAll('.filter-button')];
+      const matches = [...document.querySelectorAll('.match')];
+      const empty = document.querySelector('#empty-filter');
+
+      buttons.forEach((button) => {
+        button.addEventListener('click', () => {
+          const filter = button.dataset.filter;
+          buttons.forEach((item) => item.setAttribute('aria-pressed', String(item === button)));
+          let visible = 0;
+          matches.forEach((match) => {
+            const show = filter === 'all' || match.dataset.team === filter;
+            match.hidden = !show;
+            if (show) visible += 1;
+          });
+          empty?.classList.toggle('visible', visible === 0);
+        });
+      });
+    })();
+  </script>
+</body>
+</html>

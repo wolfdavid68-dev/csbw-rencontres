@@ -1,0 +1,20 @@
+{
+  "season_start_year": 2026,
+  "club_code": "68-CSBW",
+  "club_name": "C. Sportif Badminton Wittelsheim",
+  "league_code": "GEST",
+  "committee_code": "CD68",
+  "include_national_competitions": true,
+  "competition_ids": [],
+  "request_delay_seconds": 1.0,
+  "request_timeout_seconds": 30,
+  "timezone": "Europe/Paris",
+  "site_title": "Rencontres seniors du CSBW",
+  "home_venue_patterns": [
+    "salle pierre albouy",
+    "pierre albouy"
+  ],
+  "wordpress_url": "https://www.csbw.fr",
+  "output_dir": "public",
+  "manual_overrides_file": "overrides.json"
+}

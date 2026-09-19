@@ -1,0 +1,48 @@
+name: Article hebdomadaire - occupation de la salle
+
+on:
+  schedule:
+    - cron: "0 17 * * 0"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  article:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Récupérer le projet
+        uses: actions/checkout@v4
+
+      - name: Installer Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Installer les dépendances
+        run: pip install -r requirements.txt
+
+      - name: Tester le générateur
+        run: python -m unittest discover -s tests -v
+
+      - name: Générer et publier l'article si nécessaire
+        env:
+          WP_URL: https://www.csbw.fr
+          WP_USERNAME: ${{ secrets.WP_USERNAME }}
+          WP_APPLICATION_PASSWORD: ${{ secrets.WP_APPLICATION_PASSWORD }}
+        run: |
+          if [ -n "$WP_USERNAME" ] && [ -n "$WP_APPLICATION_PASSWORD" ]; then
+            python -m scraper.weekly_article --publish-wordpress --status publish
+          else
+            echo "Identifiants WordPress absents : aperçu généré sans publication."
+            python -m scraper.weekly_article
+          fi
+
+      - name: Conserver l'aperçu de l'article
+        uses: actions/upload-artifact@v4
+        with:
+          name: article-hebdomadaire
+          path: build-weekly
+          retention-days: 14

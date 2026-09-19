@@ -1,0 +1,735 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <link rel="icon" href="csbw-192.png">
+  <title>Rencontres seniors du CSBW - 2026-2027</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #202124;
+      --muted: #65686d;
+      --line: #d9dade;
+      --surface: #ffffff;
+      --soft: #f4f5f6;
+      --brand: #c91424;
+      --brand-dark: #8d0f19;
+      --home: #176b55;
+      --away: #315c8c;
+      --result: #5b456f;
+      --radius: 6px;
+    }
+
+    * { box-sizing: border-box; }
+
+    html { background: transparent; }
+
+    body {
+      margin: 0;
+      background: transparent;
+      color: var(--ink);
+      font: 15px/1.45 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      letter-spacing: 0;
+    }
+
+    a { color: inherit; }
+
+    .calendar {
+      width: min(100%, 980px);
+      margin: 0 auto;
+      padding: 12px;
+    }
+
+    .calendar-header {
+      display: grid;
+      grid-template-columns: 58px minmax(0, 1fr) auto;
+      gap: 14px;
+      align-items: center;
+      padding: 0 0 16px;
+      border-bottom: 3px solid var(--brand);
+    }
+
+    .brand-mark {
+      width: 58px;
+      height: 58px;
+      object-fit: contain;
+    }
+
+    h1, h2, p { margin: 0; }
+
+    h1 {
+      font-size: clamp(1.3rem, 2vw, 1.75rem);
+      line-height: 1.2;
+      font-weight: 760;
+    }
+
+    .season {
+      margin-top: 3px;
+      color: var(--muted);
+      font-size: .9rem;
+    }
+
+    .calendar-link {
+      display: inline-flex;
+      align-items: center;
+      min-height: 38px;
+      padding: 8px 12px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--surface);
+      font-weight: 650;
+      text-decoration: none;
+      white-space: nowrap;
+    }
+
+    .calendar-link:hover,
+    .calendar-link:focus-visible {
+      border-color: var(--brand);
+      color: var(--brand-dark);
+      outline: 2px solid transparent;
+    }
+
+    .status-panel {
+      margin: 18px 0;
+      padding: 18px;
+      border-left: 4px solid var(--away);
+      background: #eef4fa;
+    }
+
+    .status-panel h2 {
+      margin-bottom: 5px;
+      font-size: 1.08rem;
+    }
+
+    .toolbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      padding: 16px 0 12px;
+    }
+
+    .filters {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+
+    .filter-button {
+      min-height: 36px;
+      padding: 7px 12px;
+      border: 0;
+      border-right: 1px solid var(--line);
+      border-radius: 0;
+      background: var(--surface);
+      color: var(--ink);
+      font: inherit;
+      font-weight: 650;
+      cursor: pointer;
+    }
+
+    .filter-button:last-child { border-right: 0; }
+
+    .filter-button[aria-pressed="true"] {
+      background: var(--ink);
+      color: #fff;
+    }
+
+    .filter-button:focus-visible {
+      position: relative;
+      z-index: 1;
+      outline: 2px solid var(--brand);
+      outline-offset: -2px;
+    }
+
+    .updated {
+      color: var(--muted);
+      font-size: .82rem;
+      text-align: right;
+    }
+
+    .section-title {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 12px;
+      margin: 12px 0 8px;
+      font-size: 1.03rem;
+    }
+
+    .count {
+      color: var(--muted);
+      font-size: .82rem;
+      font-weight: 500;
+    }
+
+    .match-list {
+      display: grid;
+      gap: 8px;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .match {
+      display: grid;
+      grid-template-columns: 92px minmax(0, 1fr) minmax(170px, .7fr);
+      gap: 14px;
+      align-items: center;
+      min-height: 92px;
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-left: 4px solid var(--away);
+      border-radius: var(--radius);
+      background: var(--surface);
+    }
+
+    .match[data-home="true"] { border-left-color: var(--home); }
+    .match[data-played="true"] { border-left-color: var(--result); }
+    .match[hidden] { display: none; }
+
+    .date {
+      align-self: stretch;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      padding-right: 12px;
+      border-right: 1px solid var(--line);
+      text-transform: capitalize;
+    }
+
+    .date strong {
+      font-size: 1rem;
+      line-height: 1.2;
+    }
+
+    .date span {
+      margin-top: 4px;
+      color: var(--brand-dark);
+      font-weight: 750;
+    }
+
+    .match-main { min-width: 0; }
+
+    .meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-bottom: 6px;
+    }
+
+    .tag {
+      display: inline-flex;
+      align-items: center;
+      min-height: 24px;
+      padding: 3px 7px;
+      border-radius: 4px;
+      background: var(--soft);
+      color: var(--muted);
+      font-size: .75rem;
+      font-weight: 700;
+    }
+
+    .tag.home { background: #e6f3ef; color: var(--home); }
+    .tag.away { background: #eaf0f7; color: var(--away); }
+
+    .fixture {
+      overflow-wrap: anywhere;
+      font-size: 1rem;
+      font-weight: 720;
+    }
+
+    .score {
+      display: inline-block;
+      margin: 0 5px;
+      color: var(--brand-dark);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .venue {
+      min-width: 0;
+      color: var(--muted);
+      font-size: .86rem;
+    }
+
+    .venue a {
+      display: block;
+      overflow-wrap: anywhere;
+      color: var(--away);
+      font-weight: 650;
+      text-decoration-thickness: 1px;
+      text-underline-offset: 2px;
+    }
+
+    .source-link {
+      display: inline-block;
+      margin-top: 6px;
+      color: var(--muted);
+      font-size: .78rem;
+    }
+
+    details.results { margin-top: 20px; }
+
+    details.results > summary {
+      padding: 10px 0;
+      border-top: 1px solid var(--line);
+      font-weight: 720;
+      cursor: pointer;
+    }
+
+    .empty-filter {
+      display: none;
+      padding: 20px 0;
+      color: var(--muted);
+      text-align: center;
+    }
+
+    .empty-filter.visible { display: block; }
+
+    @media (max-width: 680px) {
+      .calendar { padding: 8px; }
+
+      .calendar-header {
+        grid-template-columns: 46px minmax(0, 1fr);
+        gap: 10px;
+      }
+
+      .brand-mark { width: 46px; height: 46px; }
+      .calendar-link { grid-column: 1 / -1; justify-content: center; }
+      .toolbar { align-items: stretch; flex-direction: column; }
+      .updated { text-align: left; }
+      .match { grid-template-columns: 76px minmax(0, 1fr); gap: 10px; }
+      .venue { grid-column: 2; }
+      .date { padding-right: 8px; }
+    }
+
+    @media (prefers-reduced-motion: no-preference) {
+      .filter-button, .calendar-link { transition: background-color .15s ease, color .15s ease, border-color .15s ease; }
+    }
+  </style>
+</head>
+<body>
+  <main class="calendar">
+    <header class="calendar-header">
+      <img class="brand-mark" src="csbw-192.png" alt="Logo du CSBW" width="58" height="58">
+      <div>
+        <h1>Rencontres seniors du CSBW</h1>
+        <p class="season">Saison 2026-2027</p>
+      </div>
+      <a class="calendar-link" href="calendrier.ics" download>S’abonner au calendrier</a>
+    </header>
+
+
+
+
+    <div class="toolbar">
+      <div class="filters" role="group" aria-label="Filtrer par équipe">
+        <button class="filter-button" type="button" data-filter="all" aria-pressed="true">Toutes</button>
+
+        <button class="filter-button" type="button" data-filter="CSBW 1" aria-pressed="false">CSBW 1</button>
+
+        <button class="filter-button" type="button" data-filter="CSBW 2" aria-pressed="false">CSBW 2</button>
+
+        <button class="filter-button" type="button" data-filter="CSBW 3" aria-pressed="false">CSBW 3</button>
+
+        <button class="filter-button" type="button" data-filter="CSBW 4" aria-pressed="false">CSBW 4</button>
+
+        <button class="filter-button" type="button" data-filter="CSBW 5" aria-pressed="false">CSBW 5</button>
+
+        <button class="filter-button" type="button" data-filter="CSBW 6" aria-pressed="false">CSBW 6</button>
+
+        <button class="filter-button" type="button" data-filter="CSBW 7" aria-pressed="false">CSBW 7</button>
+
+        <button class="filter-button" type="button" data-filter="CSBW 8" aria-pressed="false">CSBW 8</button>
+
+        <button class="filter-button" type="button" data-filter="CSBW 10" aria-pressed="false">CSBW 10</button>
+
+      </div>
+      <p class="updated">Mise à jour le 19/09/2026 à 18h56</p>
+    </div>
+
+    <section aria-labelledby="upcoming-title">
+      <h2 class="section-title" id="upcoming-title">
+        Prochaines rencontres
+        <span class="count">18 à venir</span>
+      </h2>
+      <ul class="match-list" data-list="upcoming">
+
+        <li class="match" data-team="CSBW 1" data-home="true" data-played="false">
+          <div class="date">
+            <strong>dimanche 04</strong>
+            <span>10h00</span>
+          </div>
+          <div class="match-main">
+            <div class="meta">
+              <span class="tag home">Domicile</span>
+              <span class="tag">CSBW 1</span>
+              <span class="tag">J1</span>
+            </div>
+            <p class="fixture">C. Sportif Badminton Wittelsheim 1 (68-CSBW-1) <span class="score">–</span> B.C. Musau Strasbourg 2 (67-BCMS-2)</p>
+          </div>
+          <div class="venue">
+            <a href="https://www.google.com/maps/search/?api=1&query=Halle+des+sports%2C+68950+REININGUE" target="_blank" rel="noopener">Halle des sports, 68950 REININGUE</a>
+            <a class="source-link" href="https://icbad.ffbad.org/rencontre/782029" target="_blank" rel="noopener">Voir sur ICbad</a>
+          </div>
+        </li>
+
+        <li class="match" data-team="CSBW 2" data-home="false" data-played="false">
+          <div class="date">
+            <strong>dimanche 04</strong>
+            <span>10h00</span>
+          </div>
+          <div class="match-main">
+            <div class="meta">
+              <span class="tag away">Extérieur</span>
+              <span class="tag">CSBW 2</span>
+              <span class="tag">J1</span>
+            </div>
+            <p class="fixture">Badminton Club Mulhouse 1 (68-BCM-1) <span class="score">–</span> C. Sportif Badminton Wittelsheim 2 (68-CSBW-2)</p>
+          </div>
+          <div class="venue">
+            <a href="https://www.google.com/maps/search/?api=1&query=Gymnase+L%C3%A9o+Lagrange%2C+88100+Saint-Di%C3%A9+des+Vosges" target="_blank" rel="noopener">Gymnase Léo Lagrange, 88100 Saint-Dié des Vosges</a>
+            <a class="source-link" href="https://icbad.ffbad.org/rencontre/782210" target="_blank" rel="noopener">Voir sur ICbad</a>
+          </div>
+        </li>
+
+        <li class="match" data-team="CSBW 3" data-home="false" data-played="false">
+          <div class="date">
+            <strong>dimanche 04</strong>
+            <span>10h00</span>
+          </div>
+          <div class="match-main">
+            <div class="meta">
+              <span class="tag away">Extérieur</span>
+              <span class="tag">CSBW 3</span>
+              <span class="tag">J1</span>
+            </div>
+            <p class="fixture">Emplumes Cornimont 1 (88-EC-1) <span class="score">–</span> C. Sportif Badminton Wittelsheim 3 (68-CSBW-3)</p>
+          </div>
+          <div class="venue">
+            <a href="https://www.google.com/maps/search/?api=1&query=BCH67+-+Hall+des+Sports%2C+67980+HANGENBIETEN" target="_blank" rel="noopener">BCH67 - Hall des Sports, 67980 HANGENBIETEN</a>
+            <a class="source-link" href="https://icbad.ffbad.org/rencontre/782179" target="_blank" rel="noopener">Voir sur ICbad</a>
+          </div>
+        </li>
+
+        <li class="match" data-team="CSBW 1" data-home="true" data-played="false">
+          <div class="date">
+            <strong>dimanche 04</strong>
+            <span>14h00</span>
+          </div>
+          <div class="match-main">
+            <div class="meta">
+              <span class="tag home">Domicile</span>
+              <span class="tag">CSBW 1</span>
+              <span class="tag">J2</span>
+            </div>
+            <p class="fixture">C. Sportif Badminton Wittelsheim 1 (68-CSBW-1) <span class="score">–</span> ASLB Kembs 3 (68-ASLBK-3)</p>
+          </div>
+          <div class="venue">
+            <a href="https://www.google.com/maps/search/?api=1&query=Halle+des+sports%2C+68950+REININGUE" target="_blank" rel="noopener">Halle des sports, 68950 REININGUE</a>
+            <a class="source-link" href="https://icbad.ffbad.org/rencontre/782033" target="_blank" rel="noopener">Voir sur ICbad</a>
+          </div>
+        </li>
+
+        <li class="match" data-team="CSBW 2" data-home="true" data-played="false">
+          <div class="date">
+            <strong>dimanche 04</strong>
+            <span>14h00</span>
+          </div>
+          <div class="match-main">
+            <div class="meta">
+              <span class="tag home">Domicile</span>
+              <span class="tag">CSBW 2</span>
+              <span class="tag">J2</span>
+            </div>
+            <p class="fixture">C. Sportif Badminton Wittelsheim 2 (68-CSBW-2) <span class="score">–</span> SC Sélestat 1 (67-SCS-1)</p>
+          </div>
+          <div class="venue">
+            <a href="https://www.google.com/maps/search/?api=1&query=Gymnase+L%C3%A9o+Lagrange%2C+88100+Saint-Di%C3%A9+des+Vosges" target="_blank" rel="noopener">Gymnase Léo Lagrange, 88100 Saint-Dié des Vosges</a>
+            <a class="source-link" href="https://icbad.ffbad.org/rencontre/782214" target="_blank" rel="noopener">Voir sur ICbad</a>
+          </div>
+        </li>
+
+        <li class="match" data-team="CSBW 3" data-home="true" data-played="false">
+          <div class="date">
+            <strong>dimanche 04</strong>
+            <span>14h00</span>
+          </div>
+          <div class="match-main">
+            <div class="meta">
+              <span class="tag home">Domicile</span>
+              <span class="tag">CSBW 3</span>
+              <span class="tag">J2</span>
+            </div>
+            <p class="fixture">C. Sportif Badminton Wittelsheim 3 (68-CSBW-3) <span class="score">–</span> Badminton Club Hangenbieten 1 (67-BCH-1)</p>
+          </div>
+          <div class="venue">
+            <a href="https://www.google.com/maps/search/?api=1&query=BCH67+-+Hall+des+Sports%2C+67980+HANGENBIETEN" target="_blank" rel="noopener">BCH67 - Hall des Sports, 67980 HANGENBIETEN</a>
+            <a class="source-link" href="https://icbad.ffbad.org/rencontre/782182" target="_blank" rel="noopener">Voir sur ICbad</a>
+          </div>
+        </li>
+
+        <li class="match" data-team="CSBW 10" data-home="true" data-played="false">
+          <div class="date">
+            <strong>vendredi 09</strong>
+            <span>20h30</span>
+          </div>
+          <div class="match-main">
+            <div class="meta">
+              <span class="tag home">Domicile</span>
+              <span class="tag">CSBW 10</span>
+              <span class="tag">J1</span>
+            </div>
+            <p class="fixture">C. Sportif Badminton Wittelsheim (68-CSBW-10) <span class="score">–</span> V3F - Volant des 3 Frontières 10 (68-V3F-10)</p>
+          </div>
+          <div class="venue">
+            <a href="https://www.google.com/maps/search/?api=1&query=Salle+Pierre+ALBOUY%2C+68310+WITTELSHEIM" target="_blank" rel="noopener">Salle Pierre ALBOUY, 68310 WITTELSHEIM</a>
+            <a class="source-link" href="https://icbad.ffbad.org/rencontre/784408" target="_blank" rel="noopener">Voir sur ICbad</a>
+          </div>
+        </li>
+
+        <li class="match" data-team="CSBW 4" data-home="true" data-played="false">
+          <div class="date">
+            <strong>vendredi 16</strong>
+            <span>20h30</span>
+          </div>
+          <div class="match-main">
+            <div class="meta">
+              <span class="tag home">Domicile</span>
+              <span class="tag">CSBW 4</span>
+              <span class="tag">J1</span>
+            </div>
+            <p class="fixture">C. Sportif Badminton Wittelsheim (68-CSBW-4) <span class="score">–</span> ASLB Kembs (68-ASLBK-4)</p>
+          </div>
+          <div class="venue">
+            <a href="https://www.google.com/maps/search/?api=1&query=Salle+Pierre+ALBOUY%2C+68310+WITTELSHEIM" target="_blank" rel="noopener">Salle Pierre ALBOUY, 68310 WITTELSHEIM</a>
+            <a class="source-link" href="https://icbad.ffbad.org/rencontre/784132" target="_blank" rel="noopener">Voir sur ICbad</a>
+          </div>
+        </li>
+
+        <li class="match" data-team="CSBW 10" data-home="true" data-played="false">
+          <div class="date">
+            <strong>vendredi 06</strong>
+            <span>20h30</span>
+          </div>
+          <div class="match-main">
+            <div class="meta">
+              <span class="tag home">Domicile</span>
+              <span class="tag">CSBW 10</span>
+              <span class="tag">J2</span>
+            </div>
+            <p class="fixture">C. Sportif Badminton Wittelsheim (68-CSBW-10) <span class="score">–</span> ASLB Kembs (68-ASLBK-8)</p>
+          </div>
+          <div class="venue">
+            <a href="https://www.google.com/maps/search/?api=1&query=Salle+Pierre+ALBOUY%2C+68310+WITTELSHEIM" target="_blank" rel="noopener">Salle Pierre ALBOUY, 68310 WITTELSHEIM</a>
+            <a class="source-link" href="https://icbad.ffbad.org/rencontre/784414" target="_blank" rel="noopener">Voir sur ICbad</a>
+          </div>
+        </li>
+
+        <li class="match" data-team="CSBW 5" data-home="true" data-played="false">
+          <div class="date">
+            <strong>vendredi 13</strong>
+            <span>20h30</span>
+          </div>
+          <div class="match-main">
+            <div class="meta">
+              <span class="tag home">Domicile</span>
+              <span class="tag">CSBW 5</span>
+              <span class="tag">J2</span>
+            </div>
+            <p class="fixture">C. Sportif Badminton Wittelsheim (68-CSBW-5) <span class="score">–</span> Colmar B.ra. (68-COBRA-6)</p>
+          </div>
+          <div class="venue">
+            <a href="https://www.google.com/maps/search/?api=1&query=Salle+Pierre+ALBOUY%2C+68310+WITTELSHEIM" target="_blank" rel="noopener">Salle Pierre ALBOUY, 68310 WITTELSHEIM</a>
+            <a class="source-link" href="https://icbad.ffbad.org/rencontre/784245" target="_blank" rel="noopener">Voir sur ICbad</a>
+          </div>
+        </li>
+
+        <li class="match" data-team="CSBW 10" data-home="true" data-played="false">
+          <div class="date">
+            <strong>vendredi 04</strong>
+            <span>20h30</span>
+          </div>
+          <div class="match-main">
+            <div class="meta">
+              <span class="tag home">Domicile</span>
+              <span class="tag">CSBW 10</span>
+              <span class="tag">J4</span>
+            </div>
+            <p class="fixture">C. Sportif Badminton Wittelsheim (68-CSBW-10) <span class="score">–</span> RIEDISHEIM BADMINTON CLUB (68-RBC-3)</p>
+          </div>
+          <div class="venue">
+            <a href="https://www.google.com/maps/search/?api=1&query=Salle+Pierre+ALBOUY%2C+68310+WITTELSHEIM" target="_blank" rel="noopener">Salle Pierre ALBOUY, 68310 WITTELSHEIM</a>
+            <a class="source-link" href="https://icbad.ffbad.org/rencontre/784424" target="_blank" rel="noopener">Voir sur ICbad</a>
+          </div>
+        </li>
+
+        <li class="match" data-team="CSBW 4" data-home="true" data-played="false">
+          <div class="date">
+            <strong>vendredi 04</strong>
+            <span>20h30</span>
+          </div>
+          <div class="match-main">
+            <div class="meta">
+              <span class="tag home">Domicile</span>
+              <span class="tag">CSBW 4</span>
+              <span class="tag">J4</span>
+            </div>
+            <p class="fixture">C. Sportif Badminton Wittelsheim (68-CSBW-4) <span class="score">–</span> Red Star Mulhouse Badminton (68-RSM-4)</p>
+          </div>
+          <div class="venue">
+            <a href="https://www.google.com/maps/search/?api=1&query=Salle+Pierre+ALBOUY%2C+68310+WITTELSHEIM" target="_blank" rel="noopener">Salle Pierre ALBOUY, 68310 WITTELSHEIM</a>
+            <a class="source-link" href="https://icbad.ffbad.org/rencontre/784143" target="_blank" rel="noopener">Voir sur ICbad</a>
+          </div>
+        </li>
+
+        <li class="match" data-team="CSBW 6" data-home="true" data-played="false">
+          <div class="date">
+            <strong>vendredi 04</strong>
+            <span>20h30</span>
+          </div>
+          <div class="match-main">
+            <div class="meta">
+              <span class="tag home">Domicile</span>
+              <span class="tag">CSBW 6</span>
+              <span class="tag">J4</span>
+            </div>
+            <p class="fixture">C. Sportif Badminton Wittelsheim (68-CSBW-6) <span class="score">–</span> Association Familiale de Sundhoffen (68-BCS-2)</p>
+          </div>
+          <div class="venue">
+            <a href="https://www.google.com/maps/search/?api=1&query=Salle+Pierre+ALBOUY%2C+68310+WITTELSHEIM" target="_blank" rel="noopener">Salle Pierre ALBOUY, 68310 WITTELSHEIM</a>
+            <a class="source-link" href="https://icbad.ffbad.org/rencontre/784329" target="_blank" rel="noopener">Voir sur ICbad</a>
+          </div>
+        </li>
+
+        <li class="match" data-team="CSBW 8" data-home="false" data-played="false">
+          <div class="date">
+            <strong>jeudi 10</strong>
+            <span>20h00</span>
+          </div>
+          <div class="match-main">
+            <div class="meta">
+              <span class="tag away">Extérieur</span>
+              <span class="tag">CSBW 8</span>
+              <span class="tag">J5</span>
+            </div>
+            <p class="fixture">Club De Badminton De Bartenheim (68-C2B-1) <span class="score">–</span> C. Sportif Badminton Wittelsheim (68-CSBW-8)</p>
+          </div>
+          <div class="venue">
+            <a href="https://www.google.com/maps/search/?api=1&query=ESPACE+2000%2C+68870+BARTENHEIM" target="_blank" rel="noopener">ESPACE 2000, 68870 BARTENHEIM</a>
+            <a class="source-link" href="https://icbad.ffbad.org/rencontre/784361" target="_blank" rel="noopener">Voir sur ICbad</a>
+          </div>
+        </li>
+
+        <li class="match" data-team="CSBW 5" data-home="true" data-played="false">
+          <div class="date">
+            <strong>vendredi 18</strong>
+            <span>20h30</span>
+          </div>
+          <div class="match-main">
+            <div class="meta">
+              <span class="tag home">Domicile</span>
+              <span class="tag">CSBW 5</span>
+              <span class="tag">J5</span>
+            </div>
+            <p class="fixture">C. Sportif Badminton Wittelsheim (68-CSBW-5) <span class="score">–</span> B.C.F. Guebwiller (68-BCFG-4)</p>
+          </div>
+          <div class="venue">
+            <a href="https://www.google.com/maps/search/?api=1&query=Salle+Pierre+ALBOUY%2C+68310+WITTELSHEIM" target="_blank" rel="noopener">Salle Pierre ALBOUY, 68310 WITTELSHEIM</a>
+            <a class="source-link" href="https://icbad.ffbad.org/rencontre/784253" target="_blank" rel="noopener">Voir sur ICbad</a>
+          </div>
+        </li>
+
+        <li class="match" data-team="CSBW 7" data-home="true" data-played="false">
+          <div class="date">
+            <strong>vendredi 18</strong>
+            <span>20h30</span>
+          </div>
+          <div class="match-main">
+            <div class="meta">
+              <span class="tag home">Domicile</span>
+              <span class="tag">CSBW 7</span>
+              <span class="tag">J5</span>
+            </div>
+            <p class="fixture">C. Sportif Badminton Wittelsheim (68-CSBW-7) <span class="score">–</span> Association Familiale de Sundhoffen (68-BCS-1)</p>
+          </div>
+          <div class="venue">
+            <a href="https://www.google.com/maps/search/?api=1&query=Salle+Pierre+ALBOUY%2C+68310+WITTELSHEIM" target="_blank" rel="noopener">Salle Pierre ALBOUY, 68310 WITTELSHEIM</a>
+            <a class="source-link" href="https://icbad.ffbad.org/rencontre/784301" target="_blank" rel="noopener">Voir sur ICbad</a>
+          </div>
+        </li>
+
+        <li class="match" data-team="CSBW 10" data-home="true" data-played="false">
+          <div class="date">
+            <strong>vendredi 08</strong>
+            <span>20h30</span>
+          </div>
+          <div class="match-main">
+            <div class="meta">
+              <span class="tag home">Domicile</span>
+              <span class="tag">CSBW 10</span>
+              <span class="tag">J6</span>
+            </div>
+            <p class="fixture">C. Sportif Badminton Wittelsheim (68-CSBW-10) <span class="score">–</span> ES2B Club Ungersheimois de Badminton 4 (68-ES2B-4)</p>
+          </div>
+          <div class="venue">
+            <a href="https://www.google.com/maps/search/?api=1&query=Salle+Pierre+ALBOUY%2C+68310+WITTELSHEIM" target="_blank" rel="noopener">Salle Pierre ALBOUY, 68310 WITTELSHEIM</a>
+            <a class="source-link" href="https://icbad.ffbad.org/rencontre/784434" target="_blank" rel="noopener">Voir sur ICbad</a>
+          </div>
+        </li>
+
+        <li class="match" data-team="CSBW 5" data-home="false" data-played="false">
+          <div class="date">
+            <strong>vendredi 15</strong>
+            <span>20h30</span>
+          </div>
+          <div class="match-main">
+            <div class="meta">
+              <span class="tag away">Extérieur</span>
+              <span class="tag">CSBW 5</span>
+              <span class="tag">J6</span>
+            </div>
+            <p class="fixture">RIEDISHEIM BADMINTON CLUB (68-RBC-1) <span class="score">–</span> C. Sportif Badminton Wittelsheim (68-CSBW-5)</p>
+          </div>
+          <div class="venue">
+            <a href="https://www.google.com/maps/search/?api=1&query=Complexe+sportif+CMCAS%2C+68170+Rixheim" target="_blank" rel="noopener">Complexe sportif CMCAS, 68170 Rixheim</a>
+            <a class="source-link" href="https://icbad.ffbad.org/rencontre/784256" target="_blank" rel="noopener">Voir sur ICbad</a>
+          </div>
+        </li>
+
+      </ul>
+    </section>
+
+
+    <p class="empty-filter" id="empty-filter">Aucune rencontre pour cette équipe.</p>
+
+  </main>
+
+  <script>
+    (() => {
+      const buttons = [...document.querySelectorAll('.filter-button')];
+      const matches = [...document.querySelectorAll('.match')];
+      const empty = document.querySelector('#empty-filter');
+
+      buttons.forEach((button) => {
+        button.addEventListener('click', () => {
+          const filter = button.dataset.filter;
+          buttons.forEach((item) => item.setAttribute('aria-pressed', String(item === button)));
+          let visible = 0;
+          matches.forEach((match) => {
+            const show = filter === 'all' || match.dataset.team === filter;
+            match.hidden = !show;
+            if (show) visible += 1;
+          });
+          empty?.classList.toggle('visible', visible === 0);
+        });
+      });
+    })();
+  </script>
+</body>
+</html>
