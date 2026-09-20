@@ -220,7 +220,11 @@ def publish_wordpress(
     endpoint = f"{wordpress_url.rstrip('/')}/wp-json/wp/v2/posts"
     existing_response = client.get(
         endpoint,
-        params={"slug": article.slug, "status": "any", "context": "edit"},
+        params={
+            "slug": article.slug,
+            "status": "publish,future,draft,pending,private",
+            "context": "edit",
+        },
         timeout=30,
     )
     existing_response.raise_for_status()
