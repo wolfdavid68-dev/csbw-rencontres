@@ -107,7 +107,7 @@ def build_weekly_article(
         key=lambda item: (item.start, item.team, item.id),
     )
     week_label = format_week(week_start, week_end)
-    title = f"Salle Pierre Albouy partiellement occupée - semaine {week_label}"
+    title = f"🏸 Interclubs à la salle Pierre Albouy - semaine {week_label}"
     slug = f"occupation-salle-pierre-albouy-{week_start.isoformat()}"
 
     if not selected:
@@ -129,9 +129,10 @@ def build_weekly_article(
     sections: list[str] = []
     for day, matches in sorted(grouped.items()):
         count = len(matches)
-        count_label = "Un interclub" if count == 1 else f"{count} interclubs"
+        count_label = "1 rencontre d’interclub" if count == 1 else f"{count} rencontres d’interclub"
+        day_label = format_day(day).capitalize()
         sections.append(
-            f"<h2>{count_label} ce {html.escape(format_day(day))} "
+            f"<h2>📅 {html.escape(day_label)} : {count_label} "
             "à la salle Pierre Albouy</h2>"
         )
         sections.append("<ul>")
@@ -141,7 +142,7 @@ def build_weekly_article(
             opponent = html.escape(match.opponent)
             link = html.escape(match.source_url, quote=True)
             sections.append(
-                f'<li><strong>{time_label}</strong> - '
+                f'<li>🕒 <strong>{time_label}</strong> - '
                 f'<a href="{link}">{team} reçoit {opponent}</a></li>'
             )
         sections.append("</ul>")

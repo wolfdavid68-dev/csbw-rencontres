@@ -130,14 +130,14 @@ Un seul article est créé par semaine. Une nouvelle exécution met à jour le m
 Exemple de contenu :
 
 ```html
-<h2>2 interclubs ce vendredi 4 septembre à la salle Pierre Albouy</h2>
+<h2>📅 Vendredi 4 septembre : 2 rencontres d’interclub à la salle Pierre Albouy</h2>
 <ul>
-  <li><strong>20h30</strong> - CSBW 1 reçoit Badminton Club Mulhouse</li>
-  <li><strong>20h30</strong> - CSBW 3 reçoit Colmar Badminton Racing</li>
+  <li>🕒 <strong>20h30</strong> - CSBW 1 reçoit Badminton Club Mulhouse</li>
+  <li>🕒 <strong>20h30</strong> - CSBW 3 reçoit Colmar Badminton Racing</li>
 </ul>
-<h2>Un interclub ce dimanche 6 septembre à la salle Pierre Albouy</h2>
+<h2>📅 Dimanche 6 septembre : 1 rencontre d’interclub à la salle Pierre Albouy</h2>
 <ul>
-  <li><strong>10h00</strong> - CSBW 5 reçoit Sundgau Badminton</li>
+  <li>🕒 <strong>10h00</strong> - CSBW 5 reçoit Sundgau Badminton</li>
 </ul>
 ```
 
