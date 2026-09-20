@@ -218,17 +218,17 @@ def publish_wordpress(
     client.auth = HTTPBasicAuth(username, application_password)
     client.headers.update({"User-Agent": "CSBW-Wittelsheim-weekly-article/1.0"})
     endpoint = f"{wordpress_url.rstrip('/')}/wp-json/wp/v2/posts"
-    existing_response = client.get(
-        endpoint,
-        params={
-            "slug": article.slug,
-            "status": "publish,future,draft,pending,private",
-            "context": "edit",
-        },
-        timeout=30,
-    )
-    existing_response.raise_for_status()
-    existing = existing_response.json()
+    existing: list[dict[str, Any]] = []
+    for post_status in ("publish", "future", "draft", "pending", "private"):
+        existing_response = client.get(
+            endpoint,
+            params={"slug": article.slug, "status": post_status, "context": "edit"},
+            timeout=30,
+        )
+        existing_response.raise_for_status()
+        existing = existing_response.json()
+        if existing:
+            break
     post_data = {
         "title": article.title,
         "slug": article.slug,
