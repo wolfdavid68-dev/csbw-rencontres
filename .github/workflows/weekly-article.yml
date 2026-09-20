@@ -4,6 +4,19 @@ on:
   schedule:
     - cron: "0 17 * * 0"
   workflow_dispatch:
+    inputs:
+      week_start:
+        description: "Lundi ciblé (AAAA-MM-JJ), vide pour la semaine suivante"
+        required: false
+        type: string
+      status:
+        description: "État de l'article WordPress"
+        required: true
+        default: draft
+        type: choice
+        options:
+          - draft
+          - publish
 
 permissions:
   contents: read
@@ -32,12 +45,19 @@ jobs:
           WP_URL: https://www.csbw.fr
           WP_USERNAME: ${{ secrets.WP_USERNAME }}
           WP_APPLICATION_PASSWORD: ${{ secrets.WP_APPLICATION_PASSWORD }}
+          TARGET_WEEK: ${{ inputs.week_start }}
+          PUBLICATION_STATUS: ${{ inputs.status || 'publish' }}
         run: |
+          WEEK_ARGS=()
+          if [ -n "$TARGET_WEEK" ]; then
+            WEEK_ARGS+=(--week-start "$TARGET_WEEK")
+          fi
+
           if [ -n "$WP_USERNAME" ] && [ -n "$WP_APPLICATION_PASSWORD" ]; then
-            python -m scraper.weekly_article --publish-wordpress --status publish
+            python -m scraper.weekly_article "${WEEK_ARGS[@]}" --publish-wordpress --status "$PUBLICATION_STATUS"
           else
             echo "Identifiants WordPress absents : aperçu généré sans publication."
-            python -m scraper.weekly_article
+            python -m scraper.weekly_article "${WEEK_ARGS[@]}"
           fi
 
       - name: Conserver l'aperçu de l'article

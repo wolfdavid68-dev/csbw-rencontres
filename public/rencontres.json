@@ -1,6 +1,6 @@
 {
   "season": "2026-2027",
-  "generated_at": "2026-09-19T18:56:40.200861+02:00",
+  "generated_at": "2026-09-20T15:40:58.304490+02:00",
   "status": "ready",
   "warnings": [],
   "competitions": [
@@ -154,6 +154,23 @@
   ],
   "matches": [
     {
+      "id": "784408",
+      "team_id": "76355",
+      "team": "CSBW 10",
+      "team_code": "68-CSBW-10",
+      "division": "Interclubs Comité 68 D4 - Poule A",
+      "round_number": 1,
+      "start": "2026-10-02T20:30:00+02:00",
+      "home_team": "C. Sportif Badminton Wittelsheim (68-CSBW-10)",
+      "away_team": "V3F - Volant des 3 Frontières 10 (68-V3F-10)",
+      "opponent": "V3F - Volant des 3 Frontières 10",
+      "is_home": true,
+      "venue": "Salle Pierre ALBOUY, 68310 WITTELSHEIM",
+      "score": null,
+      "source_url": "https://icbad.ffbad.org/rencontre/784408",
+      "source_status": "En saisie"
+    },
+    {
       "id": "782029",
       "team_id": "75943",
       "team": "CSBW 1",
@@ -256,23 +273,6 @@
       "source_status": "En saisie"
     },
     {
-      "id": "784408",
-      "team_id": "76355",
-      "team": "CSBW 10",
-      "team_code": "68-CSBW-10",
-      "division": "Interclubs Comité 68 D4 - Poule A",
-      "round_number": 1,
-      "start": "2026-10-09T20:30:00+02:00",
-      "home_team": "C. Sportif Badminton Wittelsheim (68-CSBW-10)",
-      "away_team": "V3F - Volant des 3 Frontières 10 (68-V3F-10)",
-      "opponent": "V3F - Volant des 3 Frontières 10",
-      "is_home": true,
-      "venue": "Salle Pierre ALBOUY, 68310 WITTELSHEIM",
-      "score": null,
-      "source_url": "https://icbad.ffbad.org/rencontre/784408",
-      "source_status": "En saisie"
-    },
-    {
       "id": "784132",
       "team_id": "76311",
       "team": "CSBW 4",
@@ -287,6 +287,23 @@
       "venue": "Salle Pierre ALBOUY, 68310 WITTELSHEIM",
       "score": null,
       "source_url": "https://icbad.ffbad.org/rencontre/784132",
+      "source_status": "En saisie"
+    },
+    {
+      "id": "784289",
+      "team_id": "76336",
+      "team": "CSBW 7",
+      "team_code": "68-CSBW-7",
+      "division": "Interclubs Comité 68 D3 - Poule A",
+      "round_number": 1,
+      "start": "2026-10-16T20:30:00+02:00",
+      "home_team": "C. Sportif Badminton Wittelsheim (68-CSBW-7)",
+      "away_team": "V3F - Volant des 3 Frontières 8 (68-V3F-8)",
+      "opponent": "V3F - Volant des 3 Frontières 8",
+      "is_home": true,
+      "venue": "Salle Pierre ALBOUY, 68310 WITTELSHEIM",
+      "score": null,
+      "source_url": "https://icbad.ffbad.org/rencontre/784289",
       "source_status": "En saisie"
     },
     {
@@ -426,6 +443,23 @@
       "source_status": "En saisie"
     },
     {
+      "id": "784476",
+      "team_id": "76365",
+      "team": "CSBW 9",
+      "team_code": "68-CSBW-9",
+      "division": "Interclubs Comité 68 D4 - Poule B",
+      "round_number": 6,
+      "start": "2027-01-06T21:00:00+01:00",
+      "home_team": "Badminton Club de Lutterbach (68-BCL-2)",
+      "away_team": "C. Sportif Badminton Wittelsheim (68-CSBW-9)",
+      "opponent": "Badminton Club de Lutterbach",
+      "is_home": false,
+      "venue": "Espace Sportif, 68460 LUTTERBACH",
+      "score": null,
+      "source_url": "https://icbad.ffbad.org/rencontre/784476",
+      "source_status": "En saisie"
+    },
+    {
       "id": "784434",
       "team_id": "76355",
       "team": "CSBW 10",
@@ -457,6 +491,23 @@
       "venue": "Complexe sportif CMCAS, 68170 Rixheim",
       "score": null,
       "source_url": "https://icbad.ffbad.org/rencontre/784256",
+      "source_status": "En saisie"
+    },
+    {
+      "id": "784311",
+      "team_id": "76336",
+      "team": "CSBW 7",
+      "team_code": "68-CSBW-7",
+      "division": "Interclubs Comité 68 D3 - Poule A",
+      "round_number": 8,
+      "start": "2027-02-12T20:20:00+01:00",
+      "home_team": "Sundgau Badminton (68-SUNBAD-3)",
+      "away_team": "C. Sportif Badminton Wittelsheim (68-CSBW-7)",
+      "opponent": "Sundgau Badminton",
+      "is_home": false,
+      "venue": "Salle La Palestre, 68130 ALTKIRCH",
+      "score": null,
+      "source_url": "https://icbad.ffbad.org/rencontre/784311",
       "source_status": "En saisie"
     }
   ]
