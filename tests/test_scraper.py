@@ -12,6 +12,12 @@ from scraper.icbad import discover_competitions, parse_matches, parse_teams
 from scraper.models import Competition, ScrapeResult
 from scraper.render import apply_overrides, render_ics
 from scraper.weekly_article import build_weekly_article, publish_wordpress
+from scraper.wordpress_events import (
+    event_payload,
+    select_week_matches,
+    sidebar_week_start,
+    sync_events_manager_week,
+)
 
 
 FIXTURES = Path(__file__).parent / "fixtures"
@@ -96,6 +102,61 @@ class ScraperTests(unittest.TestCase):
         self.assertEqual(result["action"], "updated")
         self.assertTrue(session.post_url.endswith("/posts/42"))
         self.assertEqual(session.post_payload["slug"], article.slug)
+
+    def test_sidebar_switches_to_next_week_on_sunday_evening(self) -> None:
+        self.assertEqual(
+            sidebar_week_start(datetime(2026, 9, 16, 12, tzinfo=PARIS)),
+            date(2026, 9, 14),
+        )
+        self.assertEqual(
+            sidebar_week_start(datetime(2026, 9, 20, 12, tzinfo=PARIS)),
+            date(2026, 9, 14),
+        )
+        self.assertEqual(
+            sidebar_week_start(datetime(2026, 9, 20, 19, tzinfo=PARIS)),
+            date(2026, 9, 21),
+        )
+
+    def test_sidebar_selects_all_matches_in_monday_to_sunday_week(self) -> None:
+        matches = select_week_matches(build_demo_result().matches, date(2026, 9, 7))
+        self.assertEqual(len(matches), 1)
+        self.assertFalse(matches[0].is_home)
+
+    def test_event_payload_uses_interclub_category_and_home_location(self) -> None:
+        match = build_demo_result().matches[0]
+        payload = event_payload(match, 9, 2, ["salle pierre albouy"])
+        self.assertEqual(payload["event_categories"], [9])
+        self.assertEqual(payload["location_id"], 2)
+        self.assertIn(f"CSBW_SYNC:{match.id}", payload["content"])
+
+    def test_event_sync_skips_when_events_manager_api_is_missing(self) -> None:
+        class FakeResponse:
+            status_code = 404
+
+            def raise_for_status(self) -> None:
+                raise AssertionError("404 must be handled as an unavailable API")
+
+        class FakeSession:
+            def __init__(self) -> None:
+                self.auth = None
+                self.headers: dict[str, str] = {}
+
+            def get(self, *args, **kwargs) -> FakeResponse:
+                return FakeResponse()
+
+        result = sync_events_manager_week(
+            build_demo_result().matches,
+            week_start=date(2026, 8, 31),
+            wordpress_url="https://www.csbw.fr",
+            username="user",
+            application_password="application password",
+            category_id=9,
+            home_location_id=2,
+            home_venue_patterns=["salle pierre albouy"],
+            session=FakeSession(),
+        )
+        self.assertEqual(result["action"], "skipped")
+        self.assertEqual(result["reason"], "events_manager_api_unavailable")
 
     def test_discovers_only_relevant_senior_competitions(self) -> None:
         competitions = discover_competitions(

@@ -15,6 +15,8 @@
     "pierre albouy"
   ],
   "wordpress_url": "https://www.csbw.fr",
+  "events_manager_category_id": 9,
+  "events_manager_home_location_id": 2,
   "output_dir": "public",
   "manual_overrides_file": "overrides.json"
 }

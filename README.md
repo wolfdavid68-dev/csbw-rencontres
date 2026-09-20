@@ -166,6 +166,18 @@ Une ancienne tâche Windows nommée `CSBW Weekly Home Interclubs Post` existe su
 Disable-ScheduledTask -TaskName "CSBW Weekly Home Interclubs Post"
 ```
 
+## Bloc « Interclub » de la page d’accueil
+
+Le workflow quotidien synchronise aussi le widget Events Manager intitulé « Interclub » :
+
+- du lundi au samedi, il publie toutes les rencontres de la semaine en cours ;
+- le dimanche soir, il affiche la semaine qui commence le lendemain ;
+- les rencontres à domicile et à l’extérieur sont incluses ;
+- les évènements sont classés dans la catégorie WordPress `Interclubs` ;
+- les rencontres à domicile utilisent l’emplacement `Salle Pierre Albouy`.
+
+Cette synchronisation nécessite l’API REST d’Events Manager, disponible à partir de la version 7.3. Tant que le site conserve Events Manager 7.2.2.1, le workflow ignore cette étape sans bloquer la mise à jour du calendrier. Après la mise à jour de l’extension par l’administrateur WordPress, la prochaine exécution quotidienne alimentera automatiquement le widget.
+
 ## Paramètres de saison
 
 La saison active se trouve dans `config.json` :
