@@ -8,7 +8,7 @@ from pathlib import Path
 from zoneinfo import ZoneInfo
 
 from scraper.demo import build_demo_result
-from scraper.icbad import discover_competitions, parse_matches, parse_teams
+from scraper.icbad import BASE_URL, ICBadClient, discover_competitions, parse_matches, parse_teams
 from scraper.models import Competition, ScrapeResult
 from scraper.render import apply_overrides, render_ics
 from scraper.weekly_article import build_weekly_article, publish_wordpress
@@ -30,6 +30,12 @@ class ScraperTests(unittest.TestCase):
         self.assertEqual(result.season, "2026-2027")
         self.assertEqual(len(result.matches), 6)
         self.assertEqual(sum(item.is_home for item in result.matches), 5)
+
+    def test_icbad_client_retries_temporary_service_failures(self) -> None:
+        client = ICBadClient({"season_start_year": 2026}, no_delay=True)
+        retries = client.session.get_adapter(BASE_URL).max_retries
+        self.assertEqual(retries.total, 4)
+        self.assertIn(503, retries.status_forcelist)
 
     def test_weekly_article_groups_only_home_matches_at_pierre_albouy(self) -> None:
         article = build_weekly_article(

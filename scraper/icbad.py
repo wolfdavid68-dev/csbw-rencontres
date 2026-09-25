@@ -10,6 +10,8 @@ from zoneinfo import ZoneInfo
 
 import requests
 from bs4 import BeautifulSoup, Tag
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 from .models import Competition, Match, ScrapeResult, Team
 
@@ -245,6 +247,16 @@ class ICBadClient:
                 )
             }
         )
+        retries = Retry(
+            total=4,
+            connect=4,
+            read=4,
+            status=4,
+            backoff_factor=2,
+            status_forcelist=(429, 500, 502, 503, 504),
+            allowed_methods=frozenset({"GET"}),
+        )
+        self.session.mount("https://", HTTPAdapter(max_retries=retries))
         self.timeout = int(config.get("request_timeout_seconds", 30))
         self.delay = 0.0 if no_delay else float(config.get("request_delay_seconds", 1.0))
         self._has_requested = False

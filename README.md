@@ -1,6 +1,6 @@
 # Calendrier des rencontres seniors CSBW
 
-Ce projet prépare le calendrier **2026-2027** du Club Sportif de Badminton de Wittelsheim. Il lit chaque jour les pages publiques d’[ICbad](https://icbad.ffbad.org/), repère les équipes seniors `68-CSBW`, puis génère :
+Ce projet prépare le calendrier **2026-2027** du Club Sportif de Badminton de Wittelsheim. Il lit chaque dimanche les pages publiques d’[ICbad](https://icbad.ffbad.org/), repère les équipes seniors `68-CSBW`, puis génère :
 
 - `public/index.html` : calendrier responsive pour WordPress ;
 - `public/rencontres.json` : données réutilisables ;
@@ -92,7 +92,7 @@ Le dossier est conçu pour devenir la racine d’un dépôt GitHub séparé.
 3. Dans **Settings > Pages > Build and deployment**, choisir **GitHub Actions**.
 4. Lancer une première fois l’action **Mise à jour des rencontres CSBW**.
 
-Le workflow `.github/workflows/update.yml` s’exécute ensuite chaque jour à 5 h UTC et peut aussi être lancé manuellement. Aucun ordinateur ni tablette ne doit rester allumé.
+Le workflow `.github/workflows/update.yml` s’exécute chaque dimanche à 16 h 30 UTC, trente minutes avant la publication de l’article, et peut aussi être lancé manuellement. Aucun ordinateur ni tablette ne doit rester allumé. Les erreurs temporaires d’ICbad (`429`, `500`, `502`, `503` et `504`) sont retentées automatiquement.
 
 L’adresse obtenue ressemblera à :
 
@@ -168,7 +168,7 @@ Disable-ScheduledTask -TaskName "CSBW Weekly Home Interclubs Post"
 
 ## Bloc « Interclub » de la page d’accueil
 
-Le workflow quotidien synchronise aussi le widget Events Manager intitulé « Interclub » :
+Le workflow du dimanche synchronise aussi le widget Events Manager intitulé « Interclub » :
 
 - du lundi au samedi, il publie toutes les rencontres de la semaine en cours ;
 - le dimanche soir, il affiche la semaine qui commence le lendemain ;
@@ -176,7 +176,7 @@ Le workflow quotidien synchronise aussi le widget Events Manager intitulé « In
 - les évènements sont classés dans la catégorie WordPress `Interclubs` ;
 - les rencontres à domicile utilisent l’emplacement `Salle Pierre Albouy`.
 
-Cette synchronisation nécessite l’API REST d’Events Manager, disponible à partir de la version 7.3. Tant que le site conserve Events Manager 7.2.2.1, le workflow ignore cette étape sans bloquer la mise à jour du calendrier. Après la mise à jour de l’extension par l’administrateur WordPress, la prochaine exécution quotidienne alimentera automatiquement le widget.
+Cette synchronisation nécessite l’API REST d’Events Manager, disponible à partir de la version 7.3. Tant que le site conserve Events Manager 7.2.2.1, le workflow ignore cette étape sans bloquer la mise à jour du calendrier. Après la mise à jour de l’extension par l’administrateur WordPress, la prochaine exécution du dimanche alimentera automatiquement le widget.
 
 ## Paramètres de saison
 
