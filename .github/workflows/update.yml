@@ -1,8 +1,6 @@
 name: Mise à jour des rencontres CSBW
 
 on:
-  schedule:
-    - cron: "30 16 * * 0"
   workflow_dispatch:
 
 permissions:
@@ -35,18 +33,6 @@ jobs:
 
       - name: Générer la page
         run: python -m scraper.scraper
-
-      - name: Mettre à jour le bloc Interclub de WordPress
-        env:
-          WP_URL: https://www.csbw.fr
-          WP_USERNAME: ${{ secrets.WP_USERNAME }}
-          WP_APPLICATION_PASSWORD: ${{ secrets.WP_APPLICATION_PASSWORD }}
-        run: |
-          if [ -n "$WP_USERNAME" ] && [ -n "$WP_APPLICATION_PASSWORD" ]; then
-            python -m scraper.wordpress_events
-          else
-            echo "Identifiants WordPress absents : bloc Interclub non synchronisé."
-          fi
 
       - name: Configurer GitHub Pages
         uses: actions/configure-pages@v5

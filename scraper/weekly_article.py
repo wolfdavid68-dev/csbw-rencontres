@@ -18,6 +18,7 @@ from .demo import build_demo_result
 from .icbad import ICBadClient, normalize
 from .models import Match, ScrapeResult
 from .render import apply_overrides
+from .wordpress_events import sync_events_manager_week
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -73,6 +74,19 @@ class WeeklyArticle:
 def next_week_start(now: datetime) -> date:
     today = now.date()
     return today + timedelta(days=(7 - today.weekday()) % 7)
+
+
+def load_calendar(path: Path) -> ScrapeResult:
+    data = json.loads(path.read_text(encoding="utf-8"))
+    if data.get("status") != "ready":
+        raise ValueError("Le calendrier n'est pas pret pour la publication.")
+    return ScrapeResult(
+        season=data["season"],
+        generated_at=datetime.fromisoformat(data["generated_at"]),
+        status=data["status"],
+        matches=[Match.from_dict(item) for item in data["matches"]],
+        warnings=data.get("warnings", []),
+    )
 
 
 def format_day(value: date) -> str:
@@ -260,9 +274,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--season", type=int)
     parser.add_argument("--week-start", type=date.fromisoformat, help="Lundi ciblé, au format AAAA-MM-JJ.")
     parser.add_argument("--output-dir", type=Path)
-    parser.add_argument("--demo", action="store_true")
+    source = parser.add_mutually_exclusive_group()
+    source.add_argument("--demo", action="store_true")
+    source.add_argument("--data", type=Path, help="Calendrier deja collecte, partage avec le bloc Interclub.")
     parser.add_argument("--no-delay", action="store_true")
     parser.add_argument("--publish-wordpress", action="store_true")
+    parser.add_argument("--sync-events", action="store_true", help="Synchroniser les evenements avant de publier l'article.")
     parser.add_argument("--status", choices=("draft", "pending", "private", "publish"), default="publish")
     return parser.parse_args()
 
@@ -279,6 +296,8 @@ def main() -> int:
     try:
         if args.demo:
             result = build_demo_result(config.get("timezone", "Europe/Paris"))
+        elif args.data:
+            result = load_calendar(args.data.resolve())
         else:
             season = args.season or int(config["season_start_year"])
             result = ICBadClient(config, no_delay=args.no_delay).scrape(season)
@@ -291,6 +310,26 @@ def main() -> int:
         )
         write_preview(article, output_dir, demo=args.demo)
         publication = None
+        event_sync = None
+        if args.sync_events:
+            if args.demo:
+                raise ValueError("La synchronisation des evenements est interdite en mode demonstration.")
+            event_sync = sync_events_manager_week(
+                result.matches,
+                week_start=week_start,
+                wordpress_url=os.environ.get("WP_URL", config.get("wordpress_url", "https://www.csbw.fr")),
+                username=os.environ.get("WP_USERNAME", ""),
+                application_password=os.environ.get("WP_APPLICATION_PASSWORD", ""),
+                category_id=int(config.get("events_manager_category_id", 9)),
+                home_location_id=config.get("events_manager_home_location_id"),
+                home_venue_patterns=config.get("home_venue_patterns", ["salle pierre albouy"]),
+            )
+            if event_sync["action"] != "synced":
+                raise ValueError("Events Manager indisponible : publication de l'article arretee.")
+            print(
+                f"Interclubs synchronises avant l'article: {event_sync['created']} cree(s), "
+                f"{event_sync['updated']} mis a jour."
+            )
         if args.publish_wordpress:
             publication = publish_wordpress(
                 article,
@@ -302,6 +341,8 @@ def main() -> int:
         result_payload = article.to_dict()
         if publication:
             result_payload["wordpress"] = publication
+        if event_sync:
+            result_payload["events_manager"] = event_sync
         (output_dir / "result.json").write_text(
             json.dumps(result_payload, ensure_ascii=False, indent=2) + "\n",
             encoding="utf-8",

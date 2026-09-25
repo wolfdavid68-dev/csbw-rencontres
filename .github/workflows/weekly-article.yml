@@ -1,4 +1,4 @@
-name: Article hebdomadaire - occupation de la salle
+name: Interclubs et article hebdomadaire
 
 on:
   schedule:
@@ -20,6 +20,12 @@ on:
 
 permissions:
   contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
 
 jobs:
   article:
@@ -40,7 +46,10 @@ jobs:
       - name: Tester le générateur
         run: python -m unittest discover -s tests -v
 
-      - name: Générer et publier l'article si nécessaire
+      - name: Recuperer une seule fois le calendrier ICbad
+        run: python -m scraper.scraper
+
+      - name: Mettre a jour les interclubs puis publier l'article
         env:
           WP_URL: https://www.csbw.fr
           WP_USERNAME: ${{ secrets.WP_USERNAME }}
@@ -54,29 +63,10 @@ jobs:
           fi
 
           if [ -n "$WP_USERNAME" ] && [ -n "$WP_APPLICATION_PASSWORD" ]; then
-            python -m scraper.weekly_article "${WEEK_ARGS[@]}" --publish-wordpress --status "$PUBLICATION_STATUS"
+            python -m scraper.weekly_article "${WEEK_ARGS[@]}" --data public/rencontres.json --sync-events --publish-wordpress --status "$PUBLICATION_STATUS"
           else
             echo "Identifiants WordPress absents : aperçu généré sans publication."
-            python -m scraper.weekly_article "${WEEK_ARGS[@]}"
-          fi
-
-      - name: Afficher les interclubs de la nouvelle semaine
-        env:
-          WP_URL: https://www.csbw.fr
-          WP_USERNAME: ${{ secrets.WP_USERNAME }}
-          WP_APPLICATION_PASSWORD: ${{ secrets.WP_APPLICATION_PASSWORD }}
-          TARGET_WEEK: ${{ inputs.week_start }}
-        run: |
-          python -m scraper.scraper
-          WEEK_ARGS=()
-          if [ -n "$TARGET_WEEK" ]; then
-            WEEK_ARGS+=(--week-start "$TARGET_WEEK")
-          fi
-
-          if [ -n "$WP_USERNAME" ] && [ -n "$WP_APPLICATION_PASSWORD" ]; then
-            python -m scraper.wordpress_events "${WEEK_ARGS[@]}"
-          else
-            echo "Identifiants WordPress absents : bloc Interclub non synchronisé."
+            python -m scraper.weekly_article "${WEEK_ARGS[@]}" --data public/rencontres.json
           fi
 
       - name: Conserver l'aperçu de l'article
@@ -85,3 +75,22 @@ jobs:
           name: article-hebdomadaire
           path: build-weekly
           retention-days: 14
+
+      - name: Configurer GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Preparer le calendrier en ligne
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: public
+
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: article
+    steps:
+      - name: Publier le calendrier sur GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

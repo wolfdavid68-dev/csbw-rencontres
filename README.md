@@ -92,7 +92,7 @@ Le dossier est conçu pour devenir la racine d’un dépôt GitHub séparé.
 3. Dans **Settings > Pages > Build and deployment**, choisir **GitHub Actions**.
 4. Lancer une première fois l’action **Mise à jour des rencontres CSBW**.
 
-Le workflow `.github/workflows/update.yml` s’exécute chaque dimanche à 16 h 30 UTC, trente minutes avant la publication de l’article, et peut aussi être lancé manuellement. Aucun ordinateur ni tablette ne doit rester allumé. Les erreurs temporaires d’ICbad (`429`, `500`, `502`, `503` et `504`) sont retentées automatiquement.
+Le workflow `.github/workflows/weekly-article.yml` regroupe la mise à jour du calendrier, des événements WordPress et la publication de l’article chaque dimanche à 17 h UTC (19 h en été, 18 h en hiver à Paris). GitHub peut démarrer avec du retard. Aucun ordinateur ni tablette ne doit rester allumé. Le workflow `update.yml` reste disponible uniquement sur lancement manuel pour actualiser GitHub Pages sans modifier WordPress. Les erreurs temporaires d’ICbad (`429`, `500`, `502`, `503` et `504`) sont retentées automatiquement.
 
 L’adresse obtenue ressemblera à :
 
@@ -117,7 +117,7 @@ Cette opération n’est faite qu’une fois. Les mises à jour suivantes arrive
 
 ## Article hebdomadaire sur l’occupation de la salle
 
-Le workflow `.github/workflows/weekly-article.yml` s’exécute chaque dimanche à 17 h UTC pour la semaine du lundi au dimanche qui suit.
+Le workflow `.github/workflows/weekly-article.yml` s’exécute chaque dimanche à 17 h UTC pour la semaine du lundi au dimanche qui suit. Il collecte le calendrier une seule fois, synchronise les événements de cette semaine, puis publie l’article à partir des mêmes données. Si la synchronisation échoue, la publication de l’article est arrêtée. Le calendrier GitHub Pages est ensuite déployé.
 
 Il utilise les mêmes données que le calendrier, puis conserve uniquement :
 
@@ -158,7 +158,7 @@ Dans le dépôt GitHub, créer deux secrets dans **Settings > Secrets and variab
 
 Le mot de passe habituel du compte WordPress ne doit pas être placé dans GitHub. Si la rubrique « Mots de passe d’application » n’apparaît pas dans le profil, un administrateur du site devra l’activer ou fournir un autre accès de publication.
 
-Le workflow publie directement l’article. Pour faire une phase d’essai en brouillon, remplacer `--status publish` par `--status draft` dans `weekly-article.yml`.
+L’exécution programmée publie directement l’article. Lors d’un lancement manuel, le champ `status` propose `draft` (brouillon, par défaut) ou `publish`. Attention : même en mode brouillon, les événements WordPress sont synchronisés. Pour un essai sans modification de WordPress, utiliser le workflow de test en lecture seule décrit plus bas.
 
 Une ancienne tâche Windows nommée `CSBW Weekly Home Interclubs Post` existe sur cet ordinateur. La désactiver seulement après la mise en service du workflow GitHub, afin d’éviter deux automatisations concurrentes :
 
@@ -170,8 +170,8 @@ Disable-ScheduledTask -TaskName "CSBW Weekly Home Interclubs Post"
 
 Le workflow du dimanche synchronise aussi le widget Events Manager intitulé « Interclub » :
 
-- du lundi au samedi, il publie toutes les rencontres de la semaine en cours ;
-- le dimanche soir, il affiche la semaine qui commence le lendemain ;
+- le dimanche soir, juste avant l’article, il synchronise toutes les rencontres du lundi au dimanche qui suit ;
+- aucune vérification quotidienne n’est programmée ;
 - les rencontres à domicile et à l’extérieur sont incluses ;
 - les évènements sont classés dans la catégorie WordPress `Interclubs` ;
 - les rencontres à domicile utilisent l’emplacement `Salle Pierre Albouy`.
