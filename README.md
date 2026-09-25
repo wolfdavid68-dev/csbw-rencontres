@@ -176,7 +176,13 @@ Le workflow du dimanche synchronise aussi le widget Events Manager intitulé « 
 - les évènements sont classés dans la catégorie WordPress `Interclubs` ;
 - les rencontres à domicile utilisent l’emplacement `Salle Pierre Albouy`.
 
-Cette synchronisation nécessite l’API REST d’Events Manager, disponible à partir de la version 7.3. Tant que le site conserve Events Manager 7.2.2.1, le workflow ignore cette étape sans bloquer la mise à jour du calendrier. Après la mise à jour de l’extension par l’administrateur WordPress, la prochaine exécution du dimanche alimentera automatiquement le widget.
+Cette synchronisation nécessite l’API REST d’Events Manager, disponible à partir de la version 7.3. Le site utilise désormais la version 7.4.5 ; le test du 25 septembre 2026 confirme la connexion depuis GitHub et la lecture des sept événements de la semaine du 28 septembre. Les événements saisis manuellement sont reconnus par leur lien ICbad : leurs titres, descriptions et emplacements sont conservés lors des mises à jour. Si un même lien ICbad apparaît dans plusieurs événements, la synchronisation s’arrête pour éviter une modification ambiguë.
+
+Le workflow manuel `Test connexion Events Manager (lecture seule)` vérifie les identifiants, lit les événements et simule la synchronisation de la semaine du 28 septembre 2026. Il ne publie et ne modifie aucun événement. Pour simuler une autre semaine :
+
+```powershell
+.\.venv\Scripts\python.exe -m scraper.wordpress_events --week-start 2026-09-28 --dry-run
+```
 
 ## Paramètres de saison
 

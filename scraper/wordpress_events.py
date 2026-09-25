@@ -19,6 +19,7 @@ from .models import Match
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 SYNC_MARKER = re.compile(r"CSBW_SYNC:([^:\"']+)")
+ICBAD_LINK = re.compile(r"https?://icbad\.ffbad\.org/rencontre/(\d+)(?=[/\s\"'<>?#]|$)")
 
 
 def sidebar_week_start(now: datetime) -> date:
@@ -81,9 +82,17 @@ def event_payload(
 
 
 def marker_id(event: dict[str, Any]) -> str | None:
-    content = str(event.get("content", ""))
+    value = event.get("content", "")
+    content = str(value.get("raw", value.get("rendered", ""))) if isinstance(value, dict) else str(value)
     found = SYNC_MARKER.search(content)
-    return found.group(1) if found else None
+    if found:
+        return found.group(1)
+    links = set(ICBAD_LINK.findall(html.unescape(content)))
+    if len(links) == 1:
+        return links.pop()
+    if len(links) > 1:
+        raise ValueError("Plusieurs rencontres ICbad dans un evenement : verification manuelle requise.")
+    return None
 
 
 def sync_events_manager_week(
@@ -96,6 +105,7 @@ def sync_events_manager_week(
     home_location_id: int | None,
     home_venue_patterns: list[str],
     session: requests.Session | None = None,
+    dry_run: bool = False,
 ) -> dict[str, Any]:
     if not username or not application_password:
         raise ValueError("WP_USERNAME et WP_APPLICATION_PASSWORD sont requis.")
@@ -125,12 +135,22 @@ def sync_events_manager_week(
         }
     response.raise_for_status()
     raw = response.json()
-    items = raw.get("items", []) if isinstance(raw, dict) else raw
-    existing = {
-        synced_id: event
-        for event in items
-        if isinstance(event, dict) and (synced_id := marker_id(event)) is not None
-    }
+    items = raw.get("items") if isinstance(raw, dict) else raw
+    if not isinstance(items, list):
+        raise ValueError("Liste Events Manager non reconnue : synchronisation arretee.")
+    # Refuse an incomplete page rather than risk creating duplicates.
+    if len(items) >= 100:
+        raise ValueError("Trop d'evenements pour une page : verification requise.")
+    existing = {}
+    for event in items:
+        if not isinstance(event, dict):
+            continue
+        synced_id = marker_id(event)
+        if synced_id is None:
+            continue
+        if synced_id in existing:
+            raise ValueError(f"Rencontre ICbad {synced_id} presente plusieurs fois : synchronisation arretee.")
+        existing[synced_id] = event
 
     created = 0
     updated = 0
@@ -144,15 +164,21 @@ def sync_events_manager_week(
         current = existing.get(match.id)
         if current:
             event_id = current["id"]
-            saved = client.patch(f"{endpoint}/{event_id}", json=payload, timeout=30)
+            # Keep editorial titles, descriptions and assigned venues on existing events.
+            for field in ("event_name", "content", "location_id"):
+                payload.pop(field, None)
+            if not dry_run:
+                saved = client.patch(f"{endpoint}/{event_id}", json=payload, timeout=30)
+                saved.raise_for_status()
             updated += 1
         else:
-            saved = client.post(endpoint, json=payload, timeout=30)
+            if not dry_run:
+                saved = client.post(endpoint, json=payload, timeout=30)
+                saved.raise_for_status()
             created += 1
-        saved.raise_for_status()
 
     return {
-        "action": "synced",
+        "action": "dry_run" if dry_run else "synced",
         "week_start": week_start.isoformat(),
         "week_end": week_end.isoformat(),
         "matches": len(selected),
@@ -171,6 +197,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--config", type=Path, default=PROJECT_ROOT / "config.json")
     parser.add_argument("--data", type=Path, default=PROJECT_ROOT / "public" / "rencontres.json")
     parser.add_argument("--week-start", type=date.fromisoformat, help="Lundi ciblé (AAAA-MM-JJ).")
+    parser.add_argument("--dry-run", action="store_true", help="Verifier sans publier ni modifier les evenements.")
     return parser.parse_args()
 
 
@@ -189,6 +216,7 @@ def main() -> int:
             category_id=int(config.get("events_manager_category_id", 9)),
             home_location_id=config.get("events_manager_home_location_id"),
             home_venue_patterns=config.get("home_venue_patterns", ["salle pierre albouy"]),
+            dry_run=args.dry_run,
         )
     except Exception as error:
         print(f"Echec de la synchronisation du bloc Interclub: {error}", file=sys.stderr)
@@ -196,6 +224,11 @@ def main() -> int:
 
     if result["action"] == "skipped":
         print("Bloc Interclub non synchronise: API Events Manager indisponible.")
+    elif result["action"] == "dry_run":
+        print(
+            f"Simulation sans modification: {result['matches']} rencontre(s), "
+            f"{result['created']} a creer, {result['updated']} deja presente(s)."
+        )
     else:
         print(
             f"Bloc Interclub synchronise: {result['matches']} rencontre(s), "

@@ -16,9 +16,19 @@ jobs:
         with:
           python-version: "3.12"
       - run: pip install -r requirements.txt
+      - name: Tester la reconnaissance des evenements
+        run: python -m unittest discover -s tests -v
       - name: Verifier la connexion et les rencontres existantes
         env:
           WP_URL: https://www.csbw.fr
           WP_USERNAME: ${{ secrets.WP_USERNAME }}
           WP_APPLICATION_PASSWORD: ${{ secrets.WP_APPLICATION_PASSWORD }}
         run: python -m scraper.check_wordpress_events
+      - name: Recuperer le calendrier actuel
+        run: python -m scraper.scraper --output-dir build-connection-check
+      - name: Simuler la synchronisation sans modifier WordPress
+        env:
+          WP_URL: https://www.csbw.fr
+          WP_USERNAME: ${{ secrets.WP_USERNAME }}
+          WP_APPLICATION_PASSWORD: ${{ secrets.WP_APPLICATION_PASSWORD }}
+        run: python -m scraper.wordpress_events --data build-connection-check/rencontres.json --week-start 2026-09-28 --dry-run
