@@ -5,6 +5,7 @@ import html
 import json
 import os
 import sys
+import time
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from pathlib import Path
@@ -121,7 +122,7 @@ def build_weekly_article(
         key=lambda item: (item.start, item.team, item.id),
     )
     week_label = format_week(week_start, week_end)
-    title = f"🏸 Interclubs à la salle Pierre Albouy - semaine {week_label}"
+    title = "🏸 Interclubs de la semaine"
     slug = f"occupation-salle-pierre-albouy-{week_start.isoformat()}"
 
     if not selected:
@@ -140,26 +141,30 @@ def build_weekly_article(
     for match in selected:
         grouped.setdefault(match.start.date(), []).append(match)
 
-    sections: list[str] = []
+    sections: list[str] = [
+        '<p style="font-size:16px;line-height:1.6;margin:0 0 6px;">'
+        f'<strong>{html.escape(week_label.capitalize())}</strong></p>',
+        '<p style="font-size:16px;line-height:1.6;margin:0 0 20px;">'
+        '📍 Salle Pierre Albouy</p>',
+    ]
     for day, matches in sorted(grouped.items()):
         count = len(matches)
-        count_label = "1 rencontre d’interclub" if count == 1 else f"{count} rencontres d’interclub"
+        count_label = "1 rencontre" if count == 1 else f"{count} rencontres"
         day_label = format_day(day).capitalize()
         sections.append(
-            f"<h2>📅 {html.escape(day_label)} : {count_label} "
-            "à la salle Pierre Albouy</h2>"
+            '<h2 style="font-size:20px;font-weight:600;line-height:1.4;margin:20px 0 10px;">'
+            f"📅 {html.escape(day_label)} : {count_label}</h2>"
         )
-        sections.append("<ul>")
         for match in matches:
-            time_label = match.start.strftime("%Hh%M")
+            time_label = match.start.strftime("%H h %M")
             team = html.escape(match.team)
             opponent = html.escape(match.opponent)
             link = html.escape(match.source_url, quote=True)
             sections.append(
-                f'<li>🕒 <strong>{time_label}</strong> - '
-                f'<a href="{link}">{team} reçoit {opponent}</a></li>'
+                '<p style="font-size:16px;line-height:1.6;margin:0 0 8px;">'
+                f'🕒 <strong>{time_label}</strong> · '
+                f'<a href="{link}">{team} reçoit {opponent}</a></p>'
             )
-        sections.append("</ul>")
 
     total_label = "Un interclub est prévu" if len(selected) == 1 else f"{len(selected)} interclubs sont prévus"
     excerpt = f"{total_label} à la salle Pierre Albouy pendant la semaine {week_label}."
@@ -216,6 +221,27 @@ def write_preview(article: WeeklyArticle, output_dir: Path, demo: bool = False) 
     (output_dir / "index.html").write_text(document, encoding="utf-8")
 
 
+def wordpress_request(client: requests.Session, method: str, url: str, **kwargs: Any) -> requests.Response:
+    """Retry only reads and updates of a known post, never a creation."""
+    delays = (10, 30, 60)
+    for attempt in range(len(delays) + 1):
+        try:
+            response = getattr(client, method)(url, timeout=30, **kwargs)
+            response.raise_for_status()
+            return response
+        except (requests.HTTPError, requests.ConnectionError, requests.Timeout) as error:
+            if isinstance(error, requests.HTTPError):
+                status_code = error.response.status_code if error.response is not None else None
+                if status_code not in (429, 500, 502, 503, 504):
+                    raise
+            if attempt == len(delays):
+                raise
+            print(f"WordPress temporairement indisponible : nouvelle tentative dans {delays[attempt]} s.",
+                  file=sys.stderr)
+            time.sleep(delays[attempt])
+    raise AssertionError("Unreachable")
+
+
 def publish_wordpress(
     article: WeeklyArticle,
     wordpress_url: str,
@@ -223,6 +249,7 @@ def publish_wordpress(
     application_password: str,
     status: str,
     session: requests.Session | None = None,
+    skip_published: bool = False,
 ) -> dict[str, Any]:
     if not article.should_create:
         return {"action": "skipped", "reason": "no_home_matches"}
@@ -235,15 +262,21 @@ def publish_wordpress(
     endpoint = f"{wordpress_url.rstrip('/')}/wp-json/wp/v2/posts"
     existing: list[dict[str, Any]] = []
     for post_status in ("publish", "future", "draft", "pending", "private"):
-        existing_response = client.get(
-            endpoint,
+        existing_response = wordpress_request(
+            client, "get", endpoint,
             params={"slug": article.slug, "status": post_status, "context": "edit"},
-            timeout=30,
         )
-        existing_response.raise_for_status()
         existing = existing_response.json()
         if existing:
             break
+    if existing and post_status == "publish" and skip_published and status == "publish":
+        return {
+            "action": "skipped",
+            "reason": "already_published",
+            "id": existing[0]["id"],
+            "status": "publish",
+            "link": existing[0].get("link"),
+        }
     post_data = {
         "title": article.title,
         "slug": article.slug,
@@ -253,13 +286,19 @@ def publish_wordpress(
     }
 
     if existing:
-        response = client.post(f"{endpoint}/{existing[0]['id']}", json=post_data, timeout=30)
+        post_id = existing[0]["id"]
         action = "updated"
     else:
-        response = client.post(endpoint, json=post_data, timeout=30)
+        # Reserve one draft first: publication retries then target its stable ID.
+        # An ambiguous creation failure must not trigger a second POST /posts.
+        response = client.post(endpoint, json={**post_data, "status": "draft"}, timeout=30)
+        response.raise_for_status()
+        post_id = response.json()["id"]
         action = "created"
-    response.raise_for_status()
+    response = wordpress_request(client, "post", f"{endpoint}/{post_id}", json=post_data)
     post = response.json()
+    if post.get("status") != status:
+        raise ValueError(f"Etat WordPress inattendu : {post.get('status')!r}, attendu : {status!r}.")
     return {
         "action": action,
         "id": post.get("id"),
@@ -279,6 +318,8 @@ def parse_args() -> argparse.Namespace:
     source.add_argument("--data", type=Path, help="Calendrier deja collecte, partage avec le bloc Interclub.")
     parser.add_argument("--no-delay", action="store_true")
     parser.add_argument("--publish-wordpress", action="store_true")
+    parser.add_argument("--skip-published", action="store_true",
+                        help="Conserver un article deja publie lors des rattrapages automatiques.")
     parser.add_argument("--sync-events", action="store_true", help="Synchroniser les evenements avant de publier l'article.")
     parser.add_argument("--status", choices=("draft", "pending", "private", "publish"), default="publish")
     return parser.parse_args()
@@ -337,6 +378,7 @@ def main() -> int:
                 username=os.environ.get("WP_USERNAME", ""),
                 application_password=os.environ.get("WP_APPLICATION_PASSWORD", ""),
                 status=args.status,
+                skip_published=args.skip_published,
             )
         result_payload = article.to_dict()
         if publication:

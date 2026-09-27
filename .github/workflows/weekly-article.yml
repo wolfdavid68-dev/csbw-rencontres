@@ -2,7 +2,9 @@ name: Interclubs et article hebdomadaire
 
 on:
   schedule:
-    - cron: "0 17 * * 0"
+    # Initial attempt, then two recovery attempts within the same evening.
+    - cron: "0,20,40 19 * * 0"
+      timezone: "Europe/Paris"
   workflow_dispatch:
     inputs:
       week_start:
@@ -30,6 +32,7 @@ concurrency:
 jobs:
   article:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - name: Récupérer le projet
         uses: actions/checkout@v4
@@ -56,25 +59,32 @@ jobs:
           WP_APPLICATION_PASSWORD: ${{ secrets.WP_APPLICATION_PASSWORD }}
           TARGET_WEEK: ${{ inputs.week_start }}
           PUBLICATION_STATUS: ${{ inputs.status || 'publish' }}
+          SCHEDULED_RUN: ${{ github.event_name == 'schedule' }}
         run: |
           WEEK_ARGS=()
           if [ -n "$TARGET_WEEK" ]; then
             WEEK_ARGS+=(--week-start "$TARGET_WEEK")
           fi
+          if [ "$SCHEDULED_RUN" = "true" ]; then
+            WEEK_ARGS+=(--skip-published)
+          fi
 
           if [ -n "$WP_USERNAME" ] && [ -n "$WP_APPLICATION_PASSWORD" ]; then
             python -m scraper.weekly_article "${WEEK_ARGS[@]}" --data public/rencontres.json --sync-events --publish-wordpress --status "$PUBLICATION_STATUS"
           else
-            echo "Identifiants WordPress absents : aperçu généré sans publication."
             python -m scraper.weekly_article "${WEEK_ARGS[@]}" --data public/rencontres.json
+            echo "::error::Identifiants WordPress absents : publication impossible."
+            exit 1
           fi
 
       - name: Conserver l'aperçu de l'article
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: article-hebdomadaire
           path: build-weekly
           retention-days: 14
+          if-no-files-found: warn
 
       - name: Configurer GitHub Pages
         uses: actions/configure-pages@v5

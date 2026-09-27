@@ -92,7 +92,7 @@ Le dossier est conçu pour devenir la racine d’un dépôt GitHub séparé.
 3. Dans **Settings > Pages > Build and deployment**, choisir **GitHub Actions**.
 4. Lancer une première fois l’action **Mise à jour des rencontres CSBW**.
 
-Le workflow `.github/workflows/weekly-article.yml` regroupe la mise à jour du calendrier, des événements WordPress et la publication de l’article chaque dimanche à 17 h UTC (19 h en été, 18 h en hiver à Paris). GitHub peut démarrer avec du retard. Aucun ordinateur ni tablette ne doit rester allumé. Le workflow `update.yml` reste disponible uniquement sur lancement manuel pour actualiser GitHub Pages sans modifier WordPress. Les erreurs temporaires d’ICbad (`429`, `500`, `502`, `503` et `504`) sont retentées automatiquement.
+Le workflow `.github/workflows/weekly-article.yml` regroupe la mise à jour du calendrier, des événements WordPress et la publication de l’article chaque dimanche à **19 h, heure de Paris**, en été comme en hiver (`timezone: Europe/Paris`). Deux rattrapages sont programmés à **19 h 20 et 19 h 40**. Ils conservent un article déjà publié, y compris ses modifications manuelles. GitHub peut retarder ou omettre une exécution : la publication entre 19 h et 20 h est un objectif, pas une garantie. Aucun ordinateur ni tablette ne doit rester allumé. Le workflow `update.yml` reste disponible uniquement sur lancement manuel pour actualiser GitHub Pages sans modifier WordPress. Les erreurs temporaires d’ICbad (`429`, `500`, `502`, `503` et `504`) sont retentées automatiquement.
 
 L’adresse obtenue ressemblera à :
 
@@ -117,7 +117,9 @@ Cette opération n’est faite qu’une fois. Les mises à jour suivantes arrive
 
 ## Article hebdomadaire sur l’occupation de la salle
 
-Le workflow `.github/workflows/weekly-article.yml` s’exécute chaque dimanche à 17 h UTC pour la semaine du lundi au dimanche qui suit. Il collecte le calendrier une seule fois, synchronise les événements de cette semaine, puis publie l’article à partir des mêmes données. Si la synchronisation échoue, la publication de l’article est arrêtée. Le calendrier GitHub Pages est ensuite déployé.
+Le workflow `.github/workflows/weekly-article.yml` est programmé chaque dimanche à 19 h, 19 h 20 et 19 h 40 (Europe/Paris) pour la semaine du lundi au dimanche qui suit. Chaque tentative collecte le calendrier une seule fois, synchronise les événements de cette semaine, puis publie l’article à partir des mêmes données s’il n’est pas déjà publié. Si la synchronisation échoue, la publication de l’article est arrêtée. Le calendrier GitHub Pages est ensuite déployé.
+
+Les lectures et mises à jour de l’article WordPress sont retentées après 10, 30 puis 60 secondes en cas de coupure réseau ou d’erreur HTTP `429`, `500`, `502`, `503`, `504`. Un nouvel article est d’abord réservé en brouillon, puis publié par son identifiant. Une création dont la réponse est perdue n’est jamais répétée aveuglément : le prochain rattrapage recherche d’abord le même identifiant d’URL. Les erreurs d’authentification ne sont pas retentées. Des secrets manquants font échouer la tâche au lieu d’annoncer un faux succès ; les aperçus disponibles sont conservés même en cas d’échec.
 
 Il utilise les mêmes données que le calendrier, puis conserve uniquement :
 
@@ -125,20 +127,18 @@ Il utilise les mêmes données que le calendrier, puis conserve uniquement :
 - celles dont le lieu contient « Salle Pierre Albouy » ;
 - celles prévues pendant la semaine suivante.
 
-Un seul article est créé par semaine. Une nouvelle exécution met à jour le même article grâce à son identifiant d’URL. Lorsqu’il n’y a aucune rencontre à domicile, aucun article n’est créé.
+Un seul article est créé par semaine. Une exécution manuelle peut mettre à jour le même article grâce à son identifiant d’URL ; les exécutions programmées ne touchent pas à un article déjà publié. Lorsqu’il n’y a aucune rencontre à domicile, aucun article n’est créé.
 
 Exemple de contenu :
 
 ```html
-<h2>📅 Vendredi 4 septembre : 2 rencontres d’interclub à la salle Pierre Albouy</h2>
-<ul>
-  <li>🕒 <strong>20h30</strong> - CSBW 1 reçoit Badminton Club Mulhouse</li>
-  <li>🕒 <strong>20h30</strong> - CSBW 3 reçoit Colmar Badminton Racing</li>
-</ul>
-<h2>📅 Dimanche 6 septembre : 1 rencontre d’interclub à la salle Pierre Albouy</h2>
-<ul>
-  <li>🕒 <strong>10h00</strong> - CSBW 5 reçoit Sundgau Badminton</li>
-</ul>
+<p><strong>Du 31 août au 6 septembre</strong></p>
+<p>📍 Salle Pierre Albouy</p>
+<h2>📅 Vendredi 4 septembre : 2 rencontres</h2>
+<p>🕒 <strong>20 h 30</strong> · CSBW 1 reçoit Badminton Club Mulhouse</p>
+<p>🕒 <strong>20 h 30</strong> · CSBW 3 reçoit Colmar Badminton Racing</p>
+<h2>📅 Dimanche 6 septembre : 1 rencontre</h2>
+<p>🕒 <strong>10 h 00</strong> · CSBW 5 reçoit Sundgau Badminton</p>
 ```
 
 Pour voir l’aperçu fictif :
