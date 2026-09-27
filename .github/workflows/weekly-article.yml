@@ -2,8 +2,8 @@ name: Interclubs et article hebdomadaire
 
 on:
   schedule:
-    # Initial attempt, then two recovery attempts within the same evening.
-    - cron: "0,20,40 19 * * 0"
+    # Prepare well ahead of 19:00; WordPress handles the actual publication.
+    - cron: "17 8,12,15 * * 0"
       timezone: "Europe/Paris"
   workflow_dispatch:
     inputs:
@@ -19,6 +19,11 @@ on:
         options:
           - draft
           - publish
+      schedule_sunday:
+        description: "Programmer pour dimanche 19 h (uniquement avec status publish)"
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -52,7 +57,7 @@ jobs:
       - name: Recuperer une seule fois le calendrier ICbad
         run: python -m scraper.scraper
 
-      - name: Mettre a jour les interclubs puis publier l'article
+      - name: Mettre a jour les interclubs puis preparer l'article
         env:
           WP_URL: https://www.csbw.fr
           WP_USERNAME: ${{ secrets.WP_USERNAME }}
@@ -60,13 +65,14 @@ jobs:
           TARGET_WEEK: ${{ inputs.week_start }}
           PUBLICATION_STATUS: ${{ inputs.status || 'publish' }}
           SCHEDULED_RUN: ${{ github.event_name == 'schedule' }}
+          SCHEDULE_SUNDAY: ${{ inputs.schedule_sunday }}
         run: |
           WEEK_ARGS=()
           if [ -n "$TARGET_WEEK" ]; then
             WEEK_ARGS+=(--week-start "$TARGET_WEEK")
           fi
-          if [ "$SCHEDULED_RUN" = "true" ]; then
-            WEEK_ARGS+=(--skip-published)
+          if [ "$SCHEDULED_RUN" = "true" ] || [ "$SCHEDULE_SUNDAY" = "true" ]; then
+            WEEK_ARGS+=(--skip-published --schedule-sunday)
           fi
 
           if [ -n "$WP_USERNAME" ] && [ -n "$WP_APPLICATION_PASSWORD" ]; then

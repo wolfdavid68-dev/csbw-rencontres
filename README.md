@@ -92,7 +92,9 @@ Le dossier est conçu pour devenir la racine d’un dépôt GitHub séparé.
 3. Dans **Settings > Pages > Build and deployment**, choisir **GitHub Actions**.
 4. Lancer une première fois l’action **Mise à jour des rencontres CSBW**.
 
-Le workflow `.github/workflows/weekly-article.yml` regroupe la mise à jour du calendrier, des événements WordPress et la publication de l’article chaque dimanche à **19 h, heure de Paris**, en été comme en hiver (`timezone: Europe/Paris`). Deux rattrapages sont programmés à **19 h 20 et 19 h 40**. Ils conservent un article déjà publié, y compris ses modifications manuelles. GitHub peut retarder ou omettre une exécution : la publication entre 19 h et 20 h est un objectif, pas une garantie. Aucun ordinateur ni tablette ne doit rester allumé. Le workflow `update.yml` reste disponible uniquement sur lancement manuel pour actualiser GitHub Pages sans modifier WordPress. Les erreurs temporaires d’ICbad (`429`, `500`, `502`, `503` et `504`) sont retentées automatiquement.
+Le workflow `.github/workflows/weekly-article.yml` prépare le calendrier, les événements WordPress et l’article chaque dimanche dès **8 h 17, heure de Paris**, avec deux nouvelles tentatives à **12 h 17 et 15 h 17** (`timezone: Europe/Paris`). L’article est enregistré dans WordPress avec le statut **Programmé**, pour **19 h le même dimanche**, en été comme en hiver. GitHub ne doit donc plus démarrer à 19 h pour publier. Un article déjà publié reste intact, y compris ses modifications manuelles. Aucun ordinateur ni tablette ne doit rester allumé. Le workflow `update.yml` reste disponible uniquement sur lancement manuel pour actualiser GitHub Pages sans modifier WordPress. Les erreurs temporaires d’ICbad (`429`, `500`, `502`, `503` et `504`) sont retentées automatiquement.
+
+Limite : GitHub peut retarder ou omettre la préparation. Une fois l’article programmé, WordPress utilise WP-Cron, généralement déclenché par les visites. Sans tâche chez l’hébergeur ou service externe, une absence de visites ou une panne peut encore retarder la publication après 19 h. La plage 19 h-20 h n’est donc pas garantie. Références : [planification GitHub](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#schedule), [WP-Cron](https://developer.wordpress.org/plugins/cron/).
 
 L’adresse obtenue ressemblera à :
 
@@ -117,7 +119,7 @@ Cette opération n’est faite qu’une fois. Les mises à jour suivantes arrive
 
 ## Article hebdomadaire sur l’occupation de la salle
 
-Le workflow `.github/workflows/weekly-article.yml` est programmé chaque dimanche à 19 h, 19 h 20 et 19 h 40 (Europe/Paris) pour la semaine du lundi au dimanche qui suit. Chaque tentative collecte le calendrier une seule fois, synchronise les événements de cette semaine, puis publie l’article à partir des mêmes données s’il n’est pas déjà publié. Si la synchronisation échoue, la publication de l’article est arrêtée. Le calendrier GitHub Pages est ensuite déployé.
+Le workflow `.github/workflows/weekly-article.yml` démarre chaque dimanche à 8 h 17, 12 h 17 et 15 h 17 (Europe/Paris) pour la semaine du lundi au dimanche qui suit. Chaque tentative collecte le calendrier une seule fois, synchronise les événements de cette semaine, puis programme l’article pour dimanche 19 h à partir des mêmes données. Les tentatives suivantes actualisent le même article programmé ; elles ne créent pas de doublon. Si la préparation arrive après 19 h, l’article est publié immédiatement, sauf s’il est déjà publié. Si la synchronisation échoue, la préparation de l’article est arrêtée. Le calendrier GitHub Pages est ensuite déployé.
 
 Les lectures et mises à jour de l’article WordPress sont retentées après 10, 30 puis 60 secondes en cas de coupure réseau ou d’erreur HTTP `429`, `500`, `502`, `503`, `504`. Un nouvel article est d’abord réservé en brouillon, puis publié par son identifiant. Une création dont la réponse est perdue n’est jamais répétée aveuglément : le prochain rattrapage recherche d’abord le même identifiant d’URL. Les erreurs d’authentification ne sont pas retentées. Des secrets manquants font échouer la tâche au lieu d’annoncer un faux succès ; les aperçus disponibles sont conservés même en cas d’échec.
 
@@ -127,7 +129,7 @@ Il utilise les mêmes données que le calendrier, puis conserve uniquement :
 - celles dont le lieu contient « Salle Pierre Albouy » ;
 - celles prévues pendant la semaine suivante.
 
-Un seul article est créé par semaine. Une exécution manuelle peut mettre à jour le même article grâce à son identifiant d’URL ; les exécutions programmées ne touchent pas à un article déjà publié. Lorsqu’il n’y a aucune rencontre à domicile, aucun article n’est créé.
+Un seul article est créé par semaine. Une exécution manuelle peut mettre à jour le même article grâce à son identifiant d’URL ; les exécutions programmées ne touchent pas à un article déjà publié. Lorsqu’il n’y a aucune rencontre à domicile, aucun article n’est créé. Si toutes les rencontres à domicile disparaissent lors d’une nouvelle vérification, l’article encore programmé repasse en brouillon, sans suppression. Après publication, les corrections restent manuelles.
 
 Exemple de contenu :
 
@@ -158,7 +160,7 @@ Dans le dépôt GitHub, créer deux secrets dans **Settings > Secrets and variab
 
 Le mot de passe habituel du compte WordPress ne doit pas être placé dans GitHub. Si la rubrique « Mots de passe d’application » n’apparaît pas dans le profil, un administrateur du site devra l’activer ou fournir un autre accès de publication.
 
-L’exécution programmée publie directement l’article. Lors d’un lancement manuel, le champ `status` propose `draft` (brouillon, par défaut) ou `publish`. Attention : même en mode brouillon, les événements WordPress sont synchronisés. Pour un essai sans modification de WordPress, utiliser le workflow de test en lecture seule décrit plus bas.
+L’exécution automatique utilise `--schedule-sunday` et transmet à WordPress une date UTC explicite correspondant au dimanche précédent la semaine ciblée, à 19 h à Paris. Le statut et la date retournés par WordPress sont vérifiés. Lors d’un lancement manuel, le champ `status` propose `draft` (brouillon, par défaut) ou `publish`. Cocher `schedule_sunday` avec `publish` pour programmer à 19 h ; sans cette case, `publish` conserve la publication immédiate. Attention : même en mode brouillon, les événements WordPress sont synchronisés. Pour un essai sans modification de WordPress, utiliser le workflow de test en lecture seule décrit plus bas.
 
 Une ancienne tâche Windows nommée `CSBW Weekly Home Interclubs Post` existe sur cet ordinateur. La désactiver seulement après la mise en service du workflow GitHub, afin d’éviter deux automatisations concurrentes :
 
@@ -170,7 +172,7 @@ Disable-ScheduledTask -TaskName "CSBW Weekly Home Interclubs Post"
 
 Le workflow du dimanche synchronise aussi le widget Events Manager intitulé « Interclub » :
 
-- le dimanche soir, juste avant l’article, il synchronise toutes les rencontres du lundi au dimanche qui suit ;
+- le dimanche, lors de la préparation anticipée de l’article, il synchronise toutes les rencontres du lundi au dimanche qui suit ; les règles d’affichage du widget restent inchangées ;
 - aucune vérification quotidienne n’est programmée ;
 - les rencontres à domicile et à l’extérieur sont incluses ;
 - les évènements sont classés dans la catégorie WordPress `Interclubs` ;

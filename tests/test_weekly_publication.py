@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 import unittest
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from pathlib import Path
 from unittest.mock import Mock, call, patch
 from zoneinfo import ZoneInfo
@@ -10,7 +10,7 @@ from zoneinfo import ZoneInfo
 import requests
 
 from scraper.demo import build_demo_result
-from scraper.weekly_article import build_weekly_article, next_week_start, publish_wordpress
+from scraper.weekly_article import build_weekly_article, next_week_start, publish_wordpress, sunday_publication_time
 
 
 def response(status: int, payload: object) -> requests.Response:
@@ -106,10 +106,91 @@ class WeeklyPublicationTests(unittest.TestCase):
 
     def test_workflow_has_local_schedule_recovery_and_error_artifacts(self) -> None:
         workflow = (Path(__file__).parents[1] / ".github/workflows/weekly-article.yml").read_text(encoding="utf-8")
-        self.assertIn('cron: "0,20,40 19 * * 0"', workflow)
+        self.assertIn('cron: "17 8,12,15 * * 0"', workflow)
         self.assertIn('timezone: "Europe/Paris"', workflow)
-        self.assertIn('WEEK_ARGS+=(--skip-published)', workflow)
+        self.assertIn('WEEK_ARGS+=(--skip-published --schedule-sunday)', workflow)
         self.assertIn('if: always()', workflow)
+
+    def test_sunday_deadline_handles_both_clock_changes(self) -> None:
+        for monday, utc_hour in ((date(2026, 3, 30), 17), (date(2026, 10, 26), 18)):
+            with self.subTest(monday=monday):
+                deadline = sunday_publication_time(monday)
+                self.assertEqual(deadline.weekday(), 6)
+                self.assertEqual(deadline.hour, 19)
+                self.assertEqual(deadline.astimezone(timezone.utc).hour, utc_hour)
+
+    def test_invalid_week_rejected_before_remote_requests(self) -> None:
+        self.article.week_start = date(2026, 9, 1)
+        with self.assertRaisesRegex(ValueError, "lundi"):
+            self.publish(schedule_sunday=True)
+        self.session.get.assert_not_called()
+
+    def test_early_preparation_reserves_draft_then_schedules_not_publishes(self) -> None:
+        self.session.get.return_value = response(200, [])
+        self.session.post.side_effect = [response(201, {"id": 42}), response(200, {
+            "id": 42, "status": "future", "date_gmt": "2026-08-30T17:00:00",
+        })]
+        result = self.publish(schedule_sunday=True, now=datetime(2026, 8, 30, 8, tzinfo=timezone.utc))
+        self.assertEqual(result["status"], "future")
+        calls = self.session.post.call_args_list
+        self.assertEqual(calls[0].kwargs["json"]["status"], "draft")
+        self.assertEqual(calls[1].kwargs["json"]["status"], "future")
+        self.assertEqual(calls[1].kwargs["json"]["date_gmt"], "2026-08-30T17:00:00")
+
+    def test_later_preparation_updates_same_scheduled_article(self) -> None:
+        self.session.get.side_effect = [response(200, []), response(200, [{"id": 42}])]
+        self.session.post.return_value = response(200, {
+            "id": 42, "status": "future", "date_gmt": "2026-08-30T17:00:00",
+        })
+        result = self.publish(schedule_sunday=True, now=datetime(2026, 8, 30, 13, tzinfo=timezone.utc))
+        self.assertEqual(result["action"], "updated")
+        self.session.post.assert_called_once()
+        self.assertTrue(self.session.post.call_args.args[0].endswith("/42"))
+
+    def test_late_preparation_publishes_immediately(self) -> None:
+        self.session.get.side_effect = [response(200, []), response(200, [{"id": 42}])]
+        result = self.publish(schedule_sunday=True, now=datetime(2026, 8, 30, 20, tzinfo=timezone.utc))
+        self.assertEqual(result["status"], "publish")
+        self.assertEqual(self.session.post.call_args.kwargs["json"]["status"], "publish")
+
+    def test_scheduling_never_reschedules_published_article(self) -> None:
+        result = self.publish(schedule_sunday=True, now=datetime(2026, 8, 30, 8, tzinfo=timezone.utc))
+        self.assertEqual(result["reason"], "already_published")
+        self.session.post.assert_not_called()
+
+    def test_wrong_schedule_date_is_an_error(self) -> None:
+        self.session.get.side_effect = [response(200, []), response(200, [{"id": 42}])]
+        self.session.post.return_value = response(200, {
+            "id": 42, "status": "future", "date_gmt": "2026-08-30T19:00:00",
+        })
+        with self.assertRaisesRegex(ValueError, "date de publication"):
+            self.publish(schedule_sunday=True, now=datetime(2026, 8, 30, 8, tzinfo=timezone.utc))
+
+    def test_scheduling_cannot_publish_a_manual_draft(self) -> None:
+        with self.assertRaisesRegex(ValueError, "status publish"):
+            publish_wordpress(self.article, "https://example.org", "user", "secret", "draft",
+                              session=self.session, schedule_sunday=True)
+        self.session.get.assert_not_called()
+
+    def test_empty_week_creates_no_scheduled_post(self) -> None:
+        self.article.should_create = False
+        self.session.get.return_value = response(200, [])
+        self.assertEqual(self.publish(schedule_sunday=True)["reason"], "no_home_matches")
+        self.session.post.assert_not_called()
+
+    def test_cancellation_unschedules_existing_article_without_deleting(self) -> None:
+        self.article.should_create = False
+        self.session.get.side_effect = [response(200, []), response(200, [{"id": 42}])]
+        self.session.post.return_value = response(200, {"id": 42, "status": "draft"})
+        self.assertEqual(self.publish(schedule_sunday=True)["action"], "unscheduled")
+        self.session.post.assert_called_once_with("https://example.org/wp-json/wp/v2/posts/42",
+                                                  timeout=30, json={"status": "draft"})
+        self.session.delete.assert_not_called()
+
+    def test_cancellation_does_not_unpublish_existing_article(self) -> None:
+        self.article.should_create = False
+        self.assertEqual(self.publish(schedule_sunday=True)["reason"], "already_published")
+        self.session.post.assert_not_called()
 
 
 if __name__ == "__main__":

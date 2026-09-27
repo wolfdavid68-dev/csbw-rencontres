@@ -98,6 +98,17 @@ class WeeklyPipelineTests(unittest.TestCase):
         sync.assert_called_once()
         session.assert_not_called()
 
+    def test_schedule_option_reaches_publisher(self) -> None:
+        with (
+            patch("sys.argv", self.argv + ["--schedule-sunday"]),
+            patch.object(weekly_article, "sync_events_manager_week",
+                         return_value={"action": "synced", "created": 0, "updated": 3}),
+            patch.object(weekly_article, "publish_wordpress",
+                         return_value={"action": "updated", "status": "future"}) as publish,
+        ):
+            self.assertEqual(weekly_article.main(), 0)
+        self.assertTrue(publish.call_args.kwargs["schedule_sunday"])
+
 
 if __name__ == "__main__":
     unittest.main()

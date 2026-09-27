@@ -7,7 +7,7 @@ import os
 import sys
 import time
 from dataclasses import dataclass
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 from zoneinfo import ZoneInfo
@@ -75,6 +75,13 @@ class WeeklyArticle:
 def next_week_start(now: datetime) -> date:
     today = now.date()
     return today + timedelta(days=(7 - today.weekday()) % 7)
+
+
+def sunday_publication_time(week_start: date) -> datetime:
+    if week_start.weekday() != 0:
+        raise ValueError("La semaine ciblee doit commencer un lundi.")
+    sunday = week_start - timedelta(days=1)
+    return datetime(sunday.year, sunday.month, sunday.day, 19, tzinfo=ZoneInfo("Europe/Paris"))
 
 
 def load_calendar(path: Path) -> ScrapeResult:
@@ -253,11 +260,19 @@ def publish_wordpress(
     status: str,
     session: requests.Session | None = None,
     skip_published: bool = False,
+    schedule_sunday: bool = False,
+    now: datetime | None = None,
 ) -> dict[str, Any]:
-    if not article.should_create:
+    if not article.should_create and not schedule_sunday:
         return {"action": "skipped", "reason": "no_home_matches"}
     if not username or not application_password:
         raise ValueError("WP_USERNAME et WP_APPLICATION_PASSWORD sont requis.")
+    if schedule_sunday and status != "publish":
+        raise ValueError("La programmation du dimanche exige --status publish.")
+    publish_at = sunday_publication_time(article.week_start) if schedule_sunday else None
+    current_time = now or datetime.now(timezone.utc)
+    if current_time.utcoffset() is None:
+        raise ValueError("L'heure courante doit avoir un fuseau horaire.")
 
     client = session or requests.Session()
     client.auth = HTTPBasicAuth(username, application_password)
@@ -272,7 +287,7 @@ def publish_wordpress(
         existing = existing_response.json()
         if existing:
             break
-    if existing and post_status == "publish" and skip_published and status == "publish":
+    if existing and post_status == "publish" and (skip_published or schedule_sunday) and status == "publish":
         return {
             "action": "skipped",
             "reason": "already_published",
@@ -280,6 +295,17 @@ def publish_wordpress(
             "status": "publish",
             "link": existing[0].get("link"),
         }
+    if not article.should_create:
+        if existing and post_status == "future":
+            post = wordpress_request(client, "post", f"{endpoint}/{existing[0]['id']}",
+                                     json={"status": "draft"}).json()
+            if post.get("status") != "draft":
+                raise ValueError("WordPress n'a pas confirme l'annulation de la programmation.")
+            return {"action": "unscheduled", "reason": "no_home_matches", "id": post["id"],
+                    "status": "draft", "link": post.get("link")}
+        return {"action": "skipped", "reason": "no_home_matches"}
+    if publish_at is not None:
+        status = "future" if current_time < publish_at else "publish"
     post_data = {
         "title": article.title,
         "slug": article.slug,
@@ -287,6 +313,8 @@ def publish_wordpress(
         "content": article.content,
         "status": status,
     }
+    if publish_at is not None:
+        post_data["date_gmt"] = publish_at.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S")
 
     if existing:
         post_id = existing[0]["id"]
@@ -300,12 +328,18 @@ def publish_wordpress(
         action = "created"
     response = wordpress_request(client, "post", f"{endpoint}/{post_id}", json=post_data)
     post = response.json()
-    if post.get("status") != status:
+    # A retry may finish after the publication deadline has passed.
+    published_when_due = (publish_at is not None and post.get("status") == "publish"
+                          and (now or datetime.now(timezone.utc)) >= publish_at)
+    if post.get("status") != status and not published_when_due:
         raise ValueError(f"Etat WordPress inattendu : {post.get('status')!r}, attendu : {status!r}.")
+    if publish_at is not None and post.get("status") == "future" and post.get("date_gmt") != post_data["date_gmt"]:
+        raise ValueError("WordPress n'a pas confirme la date de publication demandee.")
     return {
         "action": action,
         "id": post.get("id"),
         "status": post.get("status"),
+        "date_gmt": post.get("date_gmt"),
         "link": post.get("link"),
     }
 
@@ -323,9 +357,14 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--publish-wordpress", action="store_true")
     parser.add_argument("--skip-published", action="store_true",
                         help="Conserver un article deja publie lors des rattrapages automatiques.")
+    parser.add_argument("--schedule-sunday", action="store_true",
+                        help="Programmer dans WordPress le dimanche precedent a 19 h (Paris).")
     parser.add_argument("--sync-events", action="store_true", help="Synchroniser les evenements avant de publier l'article.")
     parser.add_argument("--status", choices=("draft", "pending", "private", "publish"), default="publish")
-    return parser.parse_args()
+    args = parser.parse_args()
+    if args.schedule_sunday and args.status != "publish":
+        parser.error("--schedule-sunday exige --status publish")
+    return args
 
 
 def main() -> int:
@@ -338,6 +377,8 @@ def main() -> int:
         output_dir = PROJECT_ROOT / output_dir
 
     try:
+        if args.schedule_sunday:
+            sunday_publication_time(week_start)
         if args.demo:
             result = build_demo_result(config.get("timezone", "Europe/Paris"))
         elif args.data:
@@ -382,7 +423,10 @@ def main() -> int:
                 application_password=os.environ.get("WP_APPLICATION_PASSWORD", ""),
                 status=args.status,
                 skip_published=args.skip_published,
+                schedule_sunday=args.schedule_sunday,
             )
+            print(f"WordPress: {publication.get('action')}, etat={publication.get('status')}, "
+                  f"date UTC={publication.get('date_gmt')}.")
         result_payload = article.to_dict()
         if publication:
             result_payload["wordpress"] = publication
