@@ -142,7 +142,7 @@ def build_weekly_article(
         grouped.setdefault(match.start.date(), []).append(match)
 
     sections: list[str] = [
-        '<p style="font-size:16px;line-height:1.6;margin:0 0 6px;">'
+        '<p style="font-size:17px;line-height:1.6;margin:0 0 6px;">'
         f'<strong>{html.escape(week_label.capitalize())}</strong></p>',
         '<p style="font-size:16px;line-height:1.6;margin:0 0 20px;">'
         '📍 Salle Pierre Albouy</p>',
@@ -152,8 +152,9 @@ def build_weekly_article(
         count_label = "1 rencontre" if count == 1 else f"{count} rencontres"
         day_label = format_day(day).capitalize()
         sections.append(
-            '<h2 style="font-size:20px;font-weight:600;line-height:1.4;margin:20px 0 10px;">'
-            f"📅 {html.escape(day_label)} : {count_label}</h2>"
+            '<h2 style="font-size:20px;font-weight:600;line-height:1.5;margin:22px 0 16px;'
+            'padding:0 0 12px;border-bottom:2px solid #d00000;">'
+            f'📅 {html.escape(day_label)} : <span style="white-space:nowrap;">{count_label}</span></h2>'
         )
         for match in matches:
             time_label = match.start.strftime("%H h %M")
@@ -161,9 +162,11 @@ def build_weekly_article(
             opponent = html.escape(match.opponent)
             link = html.escape(match.source_url, quote=True)
             sections.append(
-                '<p style="font-size:16px;line-height:1.6;margin:0 0 8px;">'
-                f'🕒 <strong>{time_label}</strong> · '
-                f'<a href="{link}">{team} reçoit {opponent}</a></p>'
+                '<p style="font-size:18px;line-height:1.8;margin:0 0 16px;overflow-wrap:anywhere;">'
+                f'🕒 <strong>{time_label}</strong><br>'
+                f'<a href="{link}" style="color:inherit;text-decoration:underline;'
+                'text-decoration-color:#d00000;text-underline-offset:4px;">'
+                f'<strong>{team} reçoit {opponent}</strong></a></p>'
             )
 
     total_label = "Un interclub est prévu" if len(selected) == 1 else f"{len(selected)} interclubs sont prévus"
