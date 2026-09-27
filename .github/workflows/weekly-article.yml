@@ -2,8 +2,8 @@ name: Interclubs et article hebdomadaire
 
 on:
   schedule:
-    # Prepare well ahead of 19:00; WordPress handles the actual publication.
-    - cron: "17 8,12,15 * * 0"
+    # Prepare early, then refresh through 17:17; WordPress publishes at 19:00.
+    - cron: "17 8,12,15,17 * * 0"
       timezone: "Europe/Paris"
   workflow_dispatch:
     inputs:

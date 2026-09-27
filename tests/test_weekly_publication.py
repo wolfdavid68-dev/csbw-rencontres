@@ -106,7 +106,7 @@ class WeeklyPublicationTests(unittest.TestCase):
 
     def test_workflow_has_local_schedule_recovery_and_error_artifacts(self) -> None:
         workflow = (Path(__file__).parents[1] / ".github/workflows/weekly-article.yml").read_text(encoding="utf-8")
-        self.assertIn('cron: "17 8,12,15 * * 0"', workflow)
+        self.assertIn('cron: "17 8,12,15,17 * * 0"', workflow)
         self.assertIn('timezone: "Europe/Paris"', workflow)
         self.assertIn('WEEK_ARGS+=(--skip-published --schedule-sunday)', workflow)
         self.assertIn('if: always()', workflow)
