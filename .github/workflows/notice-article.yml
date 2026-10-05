@@ -1,0 +1,51 @@
+name: Annonce salle occupée
+
+on:
+  workflow_dispatch:
+    inputs:
+      date:
+        description: "Jour sans entraînement (AAAA-MM-JJ)"
+        required: true
+        type: string
+      reason:
+        description: "Précision facultative (ex. : Occupée par une manifestation de la mairie.)"
+        required: false
+        type: string
+      status:
+        description: "État de l'article WordPress"
+        required: true
+        default: draft
+        type: choice
+        options:
+          - draft
+          - publish
+
+permissions:
+  contents: read
+
+jobs:
+  notice:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Récupérer le projet
+        uses: actions/checkout@v7
+
+      - name: Installer Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Installer les dépendances
+        run: pip install -r requirements.txt
+
+      - name: Créer l'annonce sur WordPress
+        env:
+          WP_URL: https://www.csbw.fr
+          WP_USERNAME: ${{ secrets.WP_USERNAME }}
+          WP_APPLICATION_PASSWORD: ${{ secrets.WP_APPLICATION_PASSWORD }}
+          NOTICE_DATE: ${{ inputs.date }}
+          NOTICE_REASON: ${{ inputs.reason }}
+          NOTICE_STATUS: ${{ inputs.status }}
+        run: python -m scraper.notice_article --date "$NOTICE_DATE" --reason "$NOTICE_REASON" --status "$NOTICE_STATUS"
