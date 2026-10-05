@@ -39,6 +39,24 @@ def select_week_matches(matches: list[Match], week_start: date) -> list[Match]:
     )
 
 
+def event_title(match: Match) -> str:
+    """Short widget title: home side first, CSBW team label and opponent without club codes."""
+    if match.is_home:
+        return f"{match.team} – {match.opponent}"
+    return f"{match.opponent} – {match.team}"
+
+
+def legacy_title(match: Match) -> str:
+    return f"{match.home_team} - {match.away_team}"
+
+
+def event_name(event: dict[str, Any]) -> str:
+    value = event.get("name", event.get("event_name", ""))
+    if isinstance(value, dict):
+        value = value.get("raw", value.get("rendered", ""))
+    return html.unescape(str(value)).strip()
+
+
 def event_payload(
     match: Match,
     category_id: int,
@@ -46,7 +64,7 @@ def event_payload(
     home_venue_patterns: list[str],
 ) -> dict[str, Any]:
     end = match.start + timedelta(hours=3)
-    title = f"{match.home_team} - {match.away_team}"
+    title = event_title(match)
     venue = html.escape(match.venue) if match.venue else UNKNOWN_VENUE
     source_url = html.escape(match.source_url, quote=True)
     content = (
@@ -181,7 +199,9 @@ def sync_events_manager_week(
             # Keep editorial titles, descriptions and assigned venues on existing events,
             # except our own placeholder written before ICbad published the venue.
             content = event_content(current)
-            preserved = ["event_name"]
+            preserved = []
+            if event_name(current) not in (legacy_title(match), event_title(match)):
+                preserved.append("event_name")
             if not (SYNC_MARKER.search(content) and UNKNOWN_VENUE in html.unescape(content)):
                 preserved += ["content", "location_id"]
             for field in preserved:

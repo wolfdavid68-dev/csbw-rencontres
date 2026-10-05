@@ -80,6 +80,20 @@ class EventSyncTests(unittest.TestCase):
         self.assertEqual(payload["location_id"], 2)
         self.assertEqual(payload["event_all_day"], 0)
 
+    def test_generated_long_title_is_shortened_but_editorial_title_kept(self):
+        generated = {
+            "id": 1241,
+            "name": f"{self.match.home_team} - {self.match.away_team}",
+            "content": '<p><a href="https://icbad.ffbad.org/rencontre/782029" title="CSBW_SYNC:782029">ICbad</a></p>',
+        }
+        session = Session([generated])
+        self.sync(session)
+        self.assertEqual(session.writes[0][2]["event_name"], f"{self.match.team} – {self.match.opponent}")
+
+        session = Session([self.event])
+        self.sync(session)
+        self.assertNotIn("event_name", session.writes[0][2])
+
     def test_dry_run_never_writes_existing_or_new_events(self):
         for items in ([self.event], []):
             session = Session(items)
