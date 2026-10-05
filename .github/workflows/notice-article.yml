@@ -4,11 +4,15 @@ on:
   workflow_dispatch:
     inputs:
       date:
-        description: "Jour sans entraînement (AAAA-MM-JJ)"
+        description: "Jour(s) sans entraînement (AAAA-MM-JJ, séparés par des virgules)"
         required: true
         type: string
       reason:
         description: "Précision facultative (ex. : Occupée par une manifestation de la mairie.)"
+        required: false
+        type: string
+      alternative:
+        description: "Solution de repli facultative (ex. : Dimanche, entraînement à la salle Zurcher.)"
         required: false
         type: string
       status:
@@ -47,5 +51,8 @@ jobs:
           WP_APPLICATION_PASSWORD: ${{ secrets.WP_APPLICATION_PASSWORD }}
           NOTICE_DATE: ${{ inputs.date }}
           NOTICE_REASON: ${{ inputs.reason }}
+          NOTICE_ALTERNATIVE: ${{ inputs.alternative }}
           NOTICE_STATUS: ${{ inputs.status }}
-        run: python -m scraper.notice_article --date "$NOTICE_DATE" --reason "$NOTICE_REASON" --status "$NOTICE_STATUS"
+        run: >-
+          python -m scraper.notice_article --date "$NOTICE_DATE" --reason "$NOTICE_REASON"
+          --alternative "$NOTICE_ALTERNATIVE" --status "$NOTICE_STATUS"
