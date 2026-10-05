@@ -2,9 +2,10 @@ name: Interclubs et article hebdomadaire
 
 on:
   schedule:
-    # Prepare early, then refresh through 17:17; WordPress publishes at 19:00.
-    - cron: "17 8,12,15,17 * * 0"
-      timezone: "Europe/Paris"
+    # GitHub cron runs in UTC: 08:17, 12:17, 15:17, 17:17 in Paris summer time,
+    # one hour earlier in winter. Several runs cover GitHub skipping one;
+    # all stay before the WordPress publication at 19:00 Paris.
+    - cron: "17 6,10,13,15 * * 0"
   workflow_dispatch:
     inputs:
       week_start:
