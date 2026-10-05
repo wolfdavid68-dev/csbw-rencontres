@@ -1,4 +1,12 @@
 {
   "delete": [],
-  "upsert": []
+  "upsert": [
+    {
+      "id": "784318",
+      "season": "2026-2027",
+      "start": "2026-10-06T20:30:00+02:00",
+      "time_known": true,
+      "venue": "Halle des Sports, 10 Place Halle des Sports, 68800 THANN"
+    }
+  ]
 }
