@@ -114,6 +114,33 @@ def event_content(event: dict[str, Any]) -> str:
     return str(value.get("raw", value.get("rendered", ""))) if isinstance(value, dict) else str(value)
 
 
+def is_truthy(value: Any) -> bool:
+    return str(value).strip().lower() in ("1", "true", "yes")
+
+
+def event_schedule(event: dict[str, Any]) -> tuple[bool, str, str | None] | None:
+    """Stored day and start time of an event, or None when the API did not return them."""
+    when = event.get("when")
+    if not isinstance(when, dict) or not when.get("start_date"):
+        return None
+    if is_truthy(when.get("all_day")):
+        return True, str(when["start_date"]), None
+    return False, str(when["start_date"]), str(when.get("start_time") or "")[:5]
+
+
+def payload_schedule(payload: dict[str, Any]) -> tuple[bool, str, str | None]:
+    if payload["event_all_day"]:
+        return True, payload["event_start_date"], None
+    return False, payload["event_start_date"], payload["event_start_time"][:5]
+
+
+def event_location_id(event: dict[str, Any]) -> int | None:
+    location = event.get("location")
+    if isinstance(location, dict) and location.get("id"):
+        return int(location["id"])
+    return None
+
+
 def marker_id(event: dict[str, Any]) -> str | None:
     content = event_content(event)
     found = SYNC_MARKER.search(content)
@@ -186,6 +213,7 @@ def sync_events_manager_week(
 
     created = 0
     updated = 0
+    recreated = 0
     for match in selected:
         payload = event_payload(
             match,
@@ -204,6 +232,24 @@ def sync_events_manager_week(
                 preserved.append("event_name")
             if not (SYNC_MARKER.search(content) and UNKNOWN_VENUE in html.unescape(content)):
                 preserved += ["content", "location_id"]
+            stored = event_schedule(current)
+            if SYNC_MARKER.search(content) and stored is not None and stored != payload_schedule(payload):
+                # Events Manager ignores time changes on existing events through its API:
+                # create the corrected event, then move ours to the trash.
+                if "event_name" in preserved:
+                    payload["event_name"] = event_name(current)
+                if "content" in preserved:
+                    payload["content"] = content
+                    payload.pop("location_id", None)
+                    if event_location_id(current) is not None:
+                        payload["location_id"] = event_location_id(current)
+                if not dry_run:
+                    saved = client.post(endpoint, json=payload, timeout=30)
+                    saved.raise_for_status()
+                    trashed = client.delete(f"{endpoint}/{event_id}", timeout=30)
+                    trashed.raise_for_status()
+                recreated += 1
+                continue
             for field in preserved:
                 payload.pop(field, None)
             if not dry_run:
@@ -223,6 +269,7 @@ def sync_events_manager_week(
         "matches": len(selected),
         "created": created,
         "updated": updated,
+        "recreated": recreated,
     }
 
 
@@ -266,12 +313,12 @@ def main() -> int:
     elif result["action"] == "dry_run":
         print(
             f"Simulation sans modification: {result['matches']} rencontre(s), "
-            f"{result['created']} a creer, {result['updated']} deja presente(s)."
+            f"{result['created']} a creer, {result['updated']} deja presente(s), {result['recreated']} a recreer (heure modifiee)."
         )
     else:
         print(
             f"Bloc Interclub synchronise: {result['matches']} rencontre(s), "
-            f"{result['created']} creee(s), {result['updated']} mise(s) a jour."
+            f"{result['created']} creee(s), {result['updated']} mise(s) a jour, {result['recreated']} recreee(s) a la nouvelle heure."
         )
     return 0
 

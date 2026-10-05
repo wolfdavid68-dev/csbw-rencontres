@@ -35,6 +35,10 @@ class Session:
         self.writes.append(("post", url, json))
         return Response([])
 
+    def delete(self, url, timeout):
+        self.writes.append(("delete", url, None))
+        return Response([])
+
 
 class EventSyncTests(unittest.TestCase):
     def setUp(self):
@@ -107,6 +111,39 @@ class EventSyncTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "plusieurs fois"):
             self.sync(session)
         self.assertEqual(session.writes, [])
+
+    def synced_event(self, when):
+        return {
+            "id": 1250, "name": "Equipe renommée", "location": {"id": 35}, "when": when,
+            "content": '<p>📍 Salle du club</p><p><a href="https://icbad.ffbad.org/rencontre/782029" '
+                       'title="CSBW_SYNC:782029">Voir la fiche ICbad</a></p>',
+        }
+
+    def test_time_published_after_all_day_event_recreates_it(self):
+        stored = self.synced_event({"all_day": True, "start_date": "2026-09-04", "start_time": "00:00:00"})
+        session = Session([stored])
+        result = self.sync(session)
+        self.assertEqual((result["created"], result["updated"], result["recreated"]), (0, 0, 1))
+        self.assertEqual([write[0] for write in session.writes], ["post", "delete"])
+        payload = session.writes[0][2]
+        self.assertEqual((payload["event_all_day"], payload["event_start_time"]), (0, "20:30:00"))
+        self.assertEqual(payload["event_name"], "Equipe renommée")
+        self.assertEqual(payload["content"], stored["content"])
+        self.assertEqual(payload["location_id"], 35)
+        self.assertTrue(session.writes[1][1].endswith("/events/1250"))
+
+        session = Session([stored])
+        self.assertEqual(self.sync(session, dry_run=True)["recreated"], 1)
+        self.assertEqual(session.writes, [])
+
+    def test_unchanged_time_or_manual_event_is_only_patched(self):
+        for event in (
+            self.synced_event({"all_day": "0", "start_date": "2026-09-04", "start_time": "20:30:00"}),
+            {**self.event, "when": {"all_day": True, "start_date": "2026-09-04"}},
+        ):
+            session = Session([event])
+            self.sync(session)
+            self.assertEqual([write[0] for write in session.writes], ["patch"])
 
     def test_content_formats_and_ambiguous_links(self):
         self.assertEqual(marker_id({"content": {"rendered": self.event["content"]}}), "782029")

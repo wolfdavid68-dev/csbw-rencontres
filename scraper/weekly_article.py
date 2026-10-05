@@ -418,7 +418,7 @@ def main() -> int:
                 raise ValueError("Events Manager indisponible : publication de l'article arretee.")
             print(
                 f"Interclubs synchronises avant l'article: {event_sync['created']} cree(s), "
-                f"{event_sync['updated']} mis a jour."
+                f"{event_sync['updated']} mis a jour, {event_sync.get('recreated', 0)} recree(s) a la nouvelle heure."
             )
         if args.publish_wordpress:
             publication = publish_wordpress(
