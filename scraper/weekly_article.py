@@ -4,6 +4,7 @@ import argparse
 import html
 import json
 import os
+import re
 import sys
 import time
 from dataclasses import dataclass
@@ -245,6 +246,10 @@ def wordpress_request(client: requests.Session, method: str, url: str, **kwargs:
             response.raise_for_status()
             return response
         except (requests.HTTPError, requests.ConnectionError, requests.Timeout) as error:
+            if isinstance(error, requests.HTTPError) and error.response is not None:
+                # A bare status hides whether WordPress, a plugin or the host refused.
+                detail = " ".join(re.sub(r"<[^>]+>", " ", error.response.text or "").split())[:300]
+                print(f"Reponse WordPress (HTTP {error.response.status_code}) : {detail or 'vide'}", file=sys.stderr)
             if isinstance(error, requests.HTTPError):
                 status_code = error.response.status_code if error.response is not None else None
                 if status_code not in (429, 500, 502, 503, 504):
