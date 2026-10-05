@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 import unittest
 from datetime import date, datetime, timezone
 from pathlib import Path
@@ -106,8 +107,16 @@ class WeeklyPublicationTests(unittest.TestCase):
 
     def test_workflow_has_local_schedule_recovery_and_error_artifacts(self) -> None:
         workflow = (Path(__file__).parents[1] / ".github/workflows/weekly-article.yml").read_text(encoding="utf-8")
-        self.assertIn('cron: "17 8,12,15,17 * * 0"', workflow)
-        self.assertIn('timezone: "Europe/Paris"', workflow)
+        # GitHub ignores a cron timezone: hours are UTC and must stay before 19:00 Paris.
+        cron = re.search(r'cron: "(\d+) ([\d,]+) \* \* 0"', workflow)
+        self.assertIsNotNone(cron)
+        self.assertNotIn("timezone:", workflow)
+        paris = ZoneInfo("Europe/Paris")
+        for sunday in (date(2026, 10, 4), date(2026, 11, 1)):
+            for hour in cron.group(2).split(","):
+                run = datetime(sunday.year, sunday.month, sunday.day, int(hour), int(cron.group(1)),
+                               tzinfo=timezone.utc)
+                self.assertLess(run.astimezone(paris).hour, 19)
         self.assertIn('WEEK_ARGS+=(--skip-published --schedule-sunday)', workflow)
         self.assertIn('if: always()', workflow)
 
