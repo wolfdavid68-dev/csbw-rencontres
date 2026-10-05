@@ -84,7 +84,8 @@ def event_payload(
         "event_start_time": match.start.strftime("%H:%M:%S"),
         "event_end_time": end.strftime("%H:%M:%S"),
         "event_all_day": 0,
-        "event_timezone": str(match.start.tzinfo or "Europe/Paris"),
+        # Matches read back from JSON carry a fixed offset ("UTC+02:00"): store the club's zone.
+        "event_timezone": getattr(match.start.tzinfo, "key", "Europe/Paris"),
         "event_rsvp": 0,
         "event_active_status": 1,
         "event_private": 0,
@@ -139,6 +140,14 @@ def event_location_id(event: dict[str, Any]) -> int | None:
     if isinstance(location, dict) and location.get("id"):
         return int(location["id"])
     return None
+
+
+def check_write(response: requests.Response, action: str) -> None:
+    """Raise with the server's answer, which a bare HTTP status hides."""
+    if response.status_code < 400:
+        return
+    detail = " ".join(re.sub(r"<[^>]+>", " ", response.text or "").split())[:300]
+    raise ValueError(f"{action} refusee par WordPress (HTTP {response.status_code}) : {detail or 'reponse vide'}")
 
 
 def marker_id(event: dict[str, Any]) -> str | None:
@@ -244,22 +253,18 @@ def sync_events_manager_week(
                     if event_location_id(current) is not None:
                         payload["location_id"] = event_location_id(current)
                 if not dry_run:
-                    saved = client.post(endpoint, json=payload, timeout=30)
-                    saved.raise_for_status()
-                    trashed = client.delete(f"{endpoint}/{event_id}", timeout=30)
-                    trashed.raise_for_status()
+                    check_write(client.post(endpoint, json=payload, timeout=30), f"Creation de {match.id}")
+                    check_write(client.delete(f"{endpoint}/{event_id}", timeout=30), f"Corbeille de {event_id}")
                 recreated += 1
                 continue
             for field in preserved:
                 payload.pop(field, None)
             if not dry_run:
-                saved = client.patch(f"{endpoint}/{event_id}", json=payload, timeout=30)
-                saved.raise_for_status()
+                check_write(client.patch(f"{endpoint}/{event_id}", json=payload, timeout=30), f"Mise a jour de {match.id}")
             updated += 1
         else:
             if not dry_run:
-                saved = client.post(endpoint, json=payload, timeout=30)
-                saved.raise_for_status()
+                check_write(client.post(endpoint, json=payload, timeout=30), f"Creation de {match.id}")
             created += 1
 
     return {

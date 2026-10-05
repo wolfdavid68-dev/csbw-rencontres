@@ -127,6 +127,7 @@ class EventSyncTests(unittest.TestCase):
         self.assertEqual([write[0] for write in session.writes], ["post", "delete"])
         payload = session.writes[0][2]
         self.assertEqual((payload["event_all_day"], payload["event_start_time"]), (0, "20:30:00"))
+        self.assertEqual(payload["event_timezone"], "Europe/Paris")
         self.assertEqual(payload["event_name"], "Equipe renommée")
         self.assertEqual(payload["content"], stored["content"])
         self.assertEqual(payload["location_id"], 35)
@@ -135,6 +136,16 @@ class EventSyncTests(unittest.TestCase):
         session = Session([stored])
         self.assertEqual(self.sync(session, dry_run=True)["recreated"], 1)
         self.assertEqual(session.writes, [])
+
+    def test_wordpress_error_message_is_reported(self):
+        class Refused(Response):
+            status_code = 503
+            text = "<html><title>503 Service Unavailable</title><p>capacity problems</p></html>"
+
+        session = Session([])
+        session.post = lambda url, json, timeout: Refused([])
+        with self.assertRaisesRegex(ValueError, "HTTP 503.*capacity problems"):
+            self.sync(session)
 
     def test_unchanged_time_or_manual_event_is_only_patched(self):
         for event in (
