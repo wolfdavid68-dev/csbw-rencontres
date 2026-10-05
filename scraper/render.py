@@ -83,13 +83,20 @@ def render_ics(result: ScrapeResult, timezone_name: str) -> str:
         away_label = match.opponent if match.is_home else match.team
         summary = f"Badminton : {home_label} - {away_label}"
         description = f"{match.division} - Journée {match.round_number or '-'}"
+        if match.time_known:
+            start_line = f"DTSTART;TZID={timezone_name}:{_ics_datetime(match.start)}"
+            end_line = f"DTEND;TZID={timezone_name}:{_ics_datetime(match.start + timedelta(hours=3))}"
+        else:
+            description += " - Horaire à confirmer"
+            start_line = f"DTSTART;VALUE=DATE:{match.start.strftime('%Y%m%d')}"
+            end_line = f"DTEND;VALUE=DATE:{(match.start + timedelta(days=1)).strftime('%Y%m%d')}"
         lines.extend(
             [
                 "BEGIN:VEVENT",
                 f"UID:icbad-{_ics_escape(match.id)}@csbw.fr",
                 f"DTSTAMP:{stamp}",
-                f"DTSTART;TZID={timezone_name}:{_ics_datetime(match.start)}",
-                f"DTEND;TZID={timezone_name}:{_ics_datetime(match.start + timedelta(hours=3))}",
+                start_line,
+                end_line,
                 f"SUMMARY:{_ics_escape(summary)}",
                 f"DESCRIPTION:{_ics_escape(description)}",
                 f"LOCATION:{_ics_escape(match.venue)}",
@@ -121,8 +128,8 @@ def write_outputs(
     )
 
     now = result.generated_at
-    upcoming = [match for match in result.matches if match.start >= now]
-    past = [match for match in result.matches if match.start < now]
+    upcoming = [match for match in result.matches if match.is_upcoming(now)]
+    past = [match for match in result.matches if not match.is_upcoming(now)]
     def team_sort_key(label: str) -> tuple[str, int, str]:
         number = re.search(r"(\d+)$", label)
         prefix = re.sub(r"\s*\d+$", "", label)
@@ -133,7 +140,7 @@ def write_outputs(
     def present(match: Match) -> dict:
         values = match.to_dict()
         values["date_label"] = match.start.strftime("%d/%m/%Y")
-        values["time_label"] = match.start.strftime("%Hh%M")
+        values["time_label"] = match.start.strftime("%Hh%M") if match.time_known else "Horaire à confirmer"
         values["weekday_label"] = [
             "lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche"
         ][match.start.weekday()]

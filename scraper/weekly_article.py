@@ -108,8 +108,13 @@ def format_week(value: date, end: date) -> str:
 
 
 def is_pierre_albouy(match: Match, patterns: list[str]) -> bool:
-    venue = normalize(match.venue or "")
-    return match.is_home and any(normalize(pattern) in venue for pattern in patterns)
+    if not match.is_home:
+        return False
+    # ICbad leaves the venue empty until the time is published: the club only receives at home.
+    if not match.venue:
+        return True
+    venue = normalize(match.venue)
+    return any(normalize(pattern) in venue for pattern in patterns)
 
 
 def build_weekly_article(
@@ -164,7 +169,7 @@ def build_weekly_article(
             f'📅 {html.escape(day_label)} : <span style="white-space:nowrap;">{count_label}</span></h2>'
         )
         for match in matches:
-            time_label = match.start.strftime("%H h %M")
+            time_label = match.start.strftime("%H h %M") if match.time_known else "Horaire à confirmer"
             team = html.escape(match.team)
             opponent = html.escape(match.opponent)
             link = html.escape(match.source_url, quote=True)

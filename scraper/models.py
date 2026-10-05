@@ -40,6 +40,13 @@ class Match:
     score: str | None
     source_url: str
     source_status: str | None = None
+    # ICbad may publish the day before the time: start is then midnight.
+    time_known: bool = True
+
+    def is_upcoming(self, now: datetime) -> bool:
+        if self.time_known:
+            return self.start >= now
+        return self.start.date() >= now.date()
 
     def to_dict(self) -> dict[str, Any]:
         data = asdict(self)

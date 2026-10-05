@@ -19,6 +19,7 @@ from .models import Match
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 SYNC_MARKER = re.compile(r"CSBW_SYNC:([^:\"']+)")
+UNKNOWN_VENUE = "Lieu à confirmer"
 ICBAD_LINK = re.compile(r"https?://icbad\.ffbad\.org/rencontre/(\d+)(?=[/\s\"'<>?#]|$)")
 
 
@@ -46,7 +47,7 @@ def event_payload(
 ) -> dict[str, Any]:
     end = match.start + timedelta(hours=3)
     title = f"{match.home_team} - {match.away_team}"
-    venue = html.escape(match.venue) if match.venue else "Lieu à confirmer"
+    venue = html.escape(match.venue) if match.venue else UNKNOWN_VENUE
     source_url = html.escape(match.source_url, quote=True)
     content = (
         f"<p><strong>Rencontre d’interclub</strong><br>"
@@ -64,6 +65,7 @@ def event_payload(
         "event_end_date": end.date().isoformat(),
         "event_start_time": match.start.strftime("%H:%M:%S"),
         "event_end_time": end.strftime("%H:%M:%S"),
+        "event_all_day": 0,
         "event_timezone": str(match.start.tzinfo or "Europe/Paris"),
         "event_rsvp": 0,
         "event_active_status": 1,
@@ -71,19 +73,31 @@ def event_payload(
         "event_categories": [category_id],
         "em_attributes": {"badnet": match.source_url},
     }
+    if not match.time_known:
+        # Keep the match on its day until ICbad publishes the time.
+        payload.update({
+            "event_end_date": match.start.date().isoformat(),
+            "event_start_time": "00:00:00",
+            "event_end_time": "23:59:59",
+            "event_all_day": 1,
+        })
     venue_lower = (match.venue or "").casefold()
     if (
         match.is_home
         and home_location_id is not None
-        and any(pattern.casefold() in venue_lower for pattern in home_venue_patterns)
+        and (not match.venue or any(pattern.casefold() in venue_lower for pattern in home_venue_patterns))
     ):
         payload["location_id"] = home_location_id
     return payload
 
 
-def marker_id(event: dict[str, Any]) -> str | None:
+def event_content(event: dict[str, Any]) -> str:
     value = event.get("content", "")
-    content = str(value.get("raw", value.get("rendered", ""))) if isinstance(value, dict) else str(value)
+    return str(value.get("raw", value.get("rendered", ""))) if isinstance(value, dict) else str(value)
+
+
+def marker_id(event: dict[str, Any]) -> str | None:
+    content = event_content(event)
     found = SYNC_MARKER.search(content)
     if found:
         return found.group(1)
@@ -164,8 +178,13 @@ def sync_events_manager_week(
         current = existing.get(match.id)
         if current:
             event_id = current["id"]
-            # Keep editorial titles, descriptions and assigned venues on existing events.
-            for field in ("event_name", "content", "location_id"):
+            # Keep editorial titles, descriptions and assigned venues on existing events,
+            # except our own placeholder written before ICbad published the venue.
+            content = event_content(current)
+            preserved = ["event_name"]
+            if not (SYNC_MARKER.search(content) and UNKNOWN_VENUE in html.unescape(content)):
+                preserved += ["content", "location_id"]
+            for field in preserved:
                 payload.pop(field, None)
             if not dry_run:
                 saved = client.patch(f"{endpoint}/{event_id}", json=payload, timeout=30)

@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import tempfile
 import unittest
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
@@ -201,13 +201,58 @@ class ScraperTests(unittest.TestCase):
             timezone=PARIS,
             now=datetime(2026, 8, 1, tzinfo=PARIS),
         )
-        self.assertEqual(len(matches), 2)
+        self.assertEqual(len(matches), 3)
         self.assertTrue(matches[0].is_home)
         self.assertEqual(matches[0].start.isoformat(), "2026-09-25T20:30:00+02:00")
         self.assertIsNone(matches[0].score)
-        self.assertFalse(matches[1].is_home)
-        self.assertEqual(matches[1].start.isoformat(), "2027-01-16T20:00:00+01:00")
-        self.assertEqual(matches[1].score, "3-5")
+        self.assertTrue(matches[0].time_known)
+        self.assertFalse(matches[2].is_home)
+        self.assertEqual(matches[2].start.isoformat(), "2027-01-16T20:00:00+01:00")
+        self.assertEqual(matches[2].score, "3-5")
+
+    def test_keeps_matches_whose_time_is_not_published_yet(self) -> None:
+        competition = Competition("2600200", "Interclubs Comité 68 D1", "https://icbad.ffbad.org/competition/2600200")
+        team = parse_teams((FIXTURES / "competition.html").read_text(encoding="utf-8"), competition, "68-CSBW")[0]
+        matches = parse_matches(
+            (FIXTURES / "team.html").read_text(encoding="utf-8"), team, "68-CSBW", 2026, PARIS,
+            datetime(2026, 10, 5, 12, tzinfo=PARIS),
+        )
+        match = next(item for item in matches if item.id == "80003")
+        self.assertFalse(match.time_known)
+        self.assertEqual(match.start.isoformat(), "2026-10-05T00:00:00+02:00")
+        self.assertIsNone(match.venue)
+        self.assertIsNone(match.score)
+        # Still upcoming during its day, although midnight has passed.
+        self.assertTrue(match.is_upcoming(datetime(2026, 10, 5, 12, tzinfo=PARIS)))
+        self.assertFalse(match.is_upcoming(datetime(2026, 10, 6, 0, 1, tzinfo=PARIS)))
+        self.assertEqual(select_week_matches(matches, date(2026, 10, 5)), [match])
+
+        result = ScrapeResult("2026-2027", datetime(2026, 10, 5, tzinfo=PARIS), "ready", matches=[match])
+        content = render_ics(result, "Europe/Paris")
+        self.assertIn("DTSTART;VALUE=DATE:20261005", content)
+        self.assertIn("DTEND;VALUE=DATE:20261006", content)
+
+        payload = event_payload(match, 9, 2, ["salle pierre albouy"])
+        self.assertEqual(payload["event_all_day"], 1)
+        self.assertEqual(payload["event_start_date"], "2026-10-05")
+        self.assertEqual(payload["event_end_date"], "2026-10-05")
+        self.assertNotIn("location_id", payload)
+        self.assertIn("Lieu à confirmer", payload["content"])
+
+    def test_home_match_without_venue_counts_as_pierre_albouy(self) -> None:
+        match = build_demo_result().matches[0]
+        match.venue = None
+        match.time_known = False
+        match.start = match.start.replace(hour=0, minute=0)
+        week_start = match.start.date() - timedelta(days=match.start.weekday())
+        article = build_weekly_article(
+            ScrapeResult("2026-2027", match.start, "ready", matches=[match]),
+            week_start,
+            ["salle pierre albouy"],
+        )
+        self.assertTrue(article.should_create)
+        self.assertIn("🕒 <strong>Horaire à confirmer</strong>", article.content)
+        self.assertEqual(event_payload(match, 9, 2, ["salle pierre albouy"])["location_id"], 2)
 
     def test_manual_override_updates_and_adds_matches(self) -> None:
         competition = Competition("2600200", "Interclubs Comité 68 D1", "https://icbad.ffbad.org/competition/2600200")
@@ -232,7 +277,7 @@ class ScraperTests(unittest.TestCase):
             path.write_text(
                 json.dumps(
                     {
-                        "delete": ["80002"],
+                        "delete": ["80002", "80003"],
                         "upsert": [
                             {"id": "80001", "season": "2026-2027", "venue": "Salle corrigée"},
                             manual,

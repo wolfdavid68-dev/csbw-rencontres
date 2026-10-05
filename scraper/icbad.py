@@ -153,13 +153,16 @@ def _season_datetime(
     value: str,
     season_start_year: int,
     timezone: ZoneInfo,
-) -> datetime:
-    match = re.search(r"(\d{1,2})/(\d{1,2})\s*(?:à|a)\s*(\d{1,2}):(\d{2})", normalize(value))
+) -> tuple[datetime, bool]:
+    """Return the start and whether ICbad already published its time."""
+    match = re.search(r"(\d{1,2})/(\d{1,2})(?:\s*(?:à|a)\s*(\d{1,2}):(\d{2}))?", normalize(value))
     if not match:
         raise ValueError(f"Date ICbad non reconnue: {value}")
-    day, month, hour, minute = (int(part) for part in match.groups())
+    day, month = int(match.group(1)), int(match.group(2))
+    time_known = match.group(3) is not None
+    hour, minute = (int(match.group(3)), int(match.group(4))) if time_known else (0, 0)
     year = season_start_year if month >= 7 else season_start_year + 1
-    return datetime(year, month, day, hour, minute, tzinfo=timezone)
+    return datetime(year, month, day, hour, minute, tzinfo=timezone), time_known
 
 
 def parse_matches(
@@ -194,7 +197,7 @@ def parse_matches(
         if id_match is None:
             continue
         try:
-            start = _season_datetime(clean_text(date_link), season_start_year, timezone)
+            start, time_known = _season_datetime(clean_text(date_link), season_start_year, timezone)
         except ValueError:
             continue
 
@@ -203,34 +206,33 @@ def parse_matches(
         away_team = clean_text(cells[5])
         score_match = re.search(r"(\d+)\s*-\s*(\d+)", clean_text(cells[4]))
         score = f"{score_match.group(1)}-{score_match.group(2)}" if score_match else None
-        if start > now and score == "0-0":
-            score = None
-
         is_home = normalize(club_code) in normalize(home_team)
         opponent = away_team if is_home else home_team
         opponent = re.sub(r"\s*\([^()]+\)\s*$", "", opponent).strip()
         status_node = cells[0].find(class_=re.compile(r"rencontre-statut"))
         source_status = clean_text(status_node.get("title")) if status_node else None
 
-        matches.append(
-            Match(
-                id=id_match.group(1),
-                team_id=team.id,
-                team=team.label,
-                team_code=team.code,
-                division=team.division,
-                round_number=int(round_match.group(1)) if round_match else None,
-                start=start,
-                home_team=home_team,
-                away_team=away_team,
-                opponent=opponent,
-                is_home=is_home,
-                venue=clean_text(cells[2]) or None,
-                score=score,
-                source_url=urljoin(BASE_URL, date_link.get("href", "")),
-                source_status=source_status,
-            )
+        match = Match(
+            id=id_match.group(1),
+            team_id=team.id,
+            team=team.label,
+            team_code=team.code,
+            division=team.division,
+            round_number=int(round_match.group(1)) if round_match else None,
+            start=start,
+            home_team=home_team,
+            away_team=away_team,
+            opponent=opponent,
+            is_home=is_home,
+            venue=clean_text(cells[2]) or None,
+            score=score,
+            source_url=urljoin(BASE_URL, date_link.get("href", "")),
+            source_status=source_status,
+            time_known=time_known,
         )
+        if match.is_upcoming(now) and score == "0-0":
+            match.score = None
+        matches.append(match)
 
     return sorted(matches, key=lambda item: (item.start, item.team, item.id))
 

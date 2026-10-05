@@ -66,6 +66,20 @@ class EventSyncTests(unittest.TestCase):
         for field in ("event_name", "content", "location_id"):
             self.assertNotIn(field, payload)
 
+    def test_synced_placeholder_is_refreshed_once_icbad_publishes_the_venue(self):
+        placeholder = {
+            "id": 1240,
+            "content": '<p>📍 Lieu à confirmer</p><p><a href="https://icbad.ffbad.org/rencontre/782029" '
+                       'title="CSBW_SYNC:782029">Voir la fiche ICbad</a></p>',
+        }
+        session = Session([placeholder])
+        self.sync(session)
+        payload = session.writes[0][2]
+        self.assertNotIn("event_name", payload)
+        self.assertIn(self.match.venue, payload["content"])
+        self.assertEqual(payload["location_id"], 2)
+        self.assertEqual(payload["event_all_day"], 0)
+
     def test_dry_run_never_writes_existing_or_new_events(self):
         for items in ([self.event], []):
             session = Session(items)
