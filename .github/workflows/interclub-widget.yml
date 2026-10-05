@@ -1,0 +1,36 @@
+name: Widget Interclub (mise en forme)
+
+on:
+  workflow_dispatch:
+    inputs:
+      apply:
+        description: "Appliquer la mise en forme du projet (sinon lecture seule)"
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+jobs:
+  widget:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements.txt
+      - name: Lire ou mettre a jour le widget
+        env:
+          WP_URL: https://www.csbw.fr
+          WP_USERNAME: ${{ secrets.WP_USERNAME }}
+          WP_APPLICATION_PASSWORD: ${{ secrets.WP_APPLICATION_PASSWORD }}
+          APPLY: ${{ inputs.apply }}
+        run: |
+          if [ "$APPLY" = "true" ]; then
+            python -m scraper.wordpress_widget --apply
+          else
+            python -m scraper.wordpress_widget
+          fi
