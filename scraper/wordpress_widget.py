@@ -18,6 +18,8 @@ from requests.auth import HTTPBasicAuth
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 WIDGET_ID = "em_widget-10"
 FORMAT_FILE = PROJECT_ROOT / "templates" / "interclub-widget-format.html"
+# The whole Monday-to-Sunday week, so matches already played stay listed until Sunday.
+SCOPE = "week"
 
 
 def php_unserialize(data: bytes) -> Any:
@@ -79,7 +81,7 @@ def form_data(number: str, settings: dict[str, Any]) -> str:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Lit ou met à jour le widget Interclub de WordPress.")
-    parser.add_argument("--apply", action="store_true", help="Remplacer la mise en forme par celle du projet.")
+    parser.add_argument("--apply", action="store_true", help="Remplacer la mise en forme et la période par celles du projet.")
     args = parser.parse_args()
 
     username = os.environ.get("WP_USERNAME", "")
@@ -100,7 +102,7 @@ def main() -> int:
             return 0
 
         new_format = FORMAT_FILE.read_text(encoding="utf-8").strip()
-        updated = {**settings, "format": new_format}
+        updated = {**settings, "format": new_format, "scope": SCOPE}
         number = WIDGET_ID.rsplit("-", 1)[1]
         response = client.put(
             f"{base}/wp-json/wp/v2/widgets/{WIDGET_ID}",
@@ -110,10 +112,10 @@ def main() -> int:
         response.raise_for_status()
         _, saved = read_instance(client, base)
         changed = sorted(key for key in set(settings) | set(saved)
-                         if key != "format" and settings.get(key) != saved.get(key))
-        if saved.get("format", "").strip() != new_format:
+                         if key not in ("format", "scope") and settings.get(key) != saved.get(key))
+        if saved.get("format", "").strip() != new_format or saved.get("scope") != SCOPE:
             raise ValueError("WordPress n'a pas enregistré la nouvelle mise en forme.")
-        print("Mise en forme du widget mise à jour.")
+        print(f"Mise en forme du widget mise à jour (période : {SCOPE}).")
         if changed:
             print(f"Autres réglages modifiés par WordPress : {', '.join(changed)}")
     except Exception as error:

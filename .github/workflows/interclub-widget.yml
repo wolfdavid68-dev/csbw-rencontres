@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       apply:
-        description: "Appliquer la mise en forme du projet (sinon lecture seule)"
+        description: "Appliquer la mise en forme et la période « semaine entière » du projet (sinon lecture seule)"
         required: false
         default: false
         type: boolean

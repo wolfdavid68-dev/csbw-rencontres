@@ -172,7 +172,8 @@ Disable-ScheduledTask -TaskName "CSBW Weekly Home Interclubs Post"
 
 Le workflow du dimanche synchronise aussi le widget Events Manager intitulé « Interclub » :
 
-- le dimanche, lors de la préparation anticipée de l’article, il synchronise toutes les rencontres du lundi au dimanche qui suit ; les règles d’affichage du widget restent inchangées ;
+- le dimanche, lors de la préparation anticipée de l’article, il synchronise toutes les rencontres du lundi au dimanche qui suit ;
+- le widget affiche toute la semaine en cours (réglage `week`), y compris les rencontres déjà jouées, jusqu’au dimanche soir ; le workflow `Widget Interclub (mise en forme)` avec `apply` réapplique ce réglage et la mise en forme ;
 - aucune vérification quotidienne n’est programmée ;
 - les rencontres à domicile et à l’extérieur sont incluses ;
 - les évènements sont classés dans la catégorie WordPress `Interclubs` ;
