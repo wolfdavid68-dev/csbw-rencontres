@@ -1,7 +1,7 @@
 import unittest
 from urllib.parse import parse_qs
 
-from scraper.wordpress_widget import form_data, php_unserialize, widget_summary
+from scraper.wordpress_widget import form_data, php_unserialize, widget_summary, with_events_block
 
 
 class WidgetTests(unittest.TestCase):
@@ -26,3 +26,13 @@ class WidgetTests(unittest.TestCase):
         summary = widget_summary(widget)
         self.assertIn("block-3", summary)
         self.assertIn("csbw-manifestations-widget", summary)
+
+    def test_events_block_is_appended_once_and_replaced(self):
+        block = "<!-- csbw-events-widget:start -->\n<script>v1</script>\n<!-- csbw-events-widget:end -->"
+        footer = with_events_block("</ul>\n<script>tri</script>", block)
+        self.assertEqual(footer, "</ul>\n<script>tri</script>\n\n" + block)
+        updated = with_events_block(footer, block.replace("v1", "v2"))
+        self.assertEqual(updated.count("csbw-events-widget:start"), 1)
+        self.assertIn("v2", updated)
+        self.assertNotIn("v1", updated)
+        self.assertTrue(updated.startswith("</ul>\n<script>tri</script>"))

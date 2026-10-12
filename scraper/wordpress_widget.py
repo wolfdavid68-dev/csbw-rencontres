@@ -6,6 +6,7 @@ import argparse
 import base64
 import json
 import os
+import re
 import sys
 from pathlib import Path
 from typing import Any
@@ -18,6 +19,10 @@ from requests.auth import HTTPBasicAuth
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 WIDGET_ID = "em_widget-10"
 FORMAT_FILE = PROJECT_ROOT / "templates" / "interclub-widget-format.html"
+# The "Événements" box is built by this script; kept in the Interclub footer so every page with the
+# sidebar shows it, instead of depending on a post still being listed on the homepage.
+EVENTS_FILE = PROJECT_ROOT / "templates" / "events-sidebar-widget.html"
+EVENTS_BLOCK = re.compile(r"\n*<!-- csbw-events-widget:start -->.*?<!-- csbw-events-widget:end -->", re.S)
 # The whole Monday-to-Sunday week, so matches already played stay listed until Sunday.
 SCOPE = "week"
 
@@ -108,9 +113,14 @@ def form_data(number: str, settings: dict[str, Any]) -> str:
     return urlencode(fields)
 
 
+def with_events_block(footer: str, block: str) -> str:
+    """Replace the managed events block in the footer, or append it once."""
+    return EVENTS_BLOCK.sub("", footer).rstrip() + "\n\n" + block.strip()
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Lit ou met à jour le widget Interclub de WordPress.")
-    parser.add_argument("--apply", action="store_true", help="Remplacer la mise en forme et la période par celles du projet.")
+    parser.add_argument("--apply", action="store_true", help="Remplacer la mise en forme, la période et l'encadré Événements par ceux du projet.")
     args = parser.parse_args()
 
     username = os.environ.get("WP_USERNAME", "")
@@ -132,7 +142,8 @@ def main() -> int:
             return 0
 
         new_format = FORMAT_FILE.read_text(encoding="utf-8").strip()
-        updated = {**settings, "format": new_format, "scope": SCOPE}
+        new_footer = with_events_block(settings.get("format_footer") or "", EVENTS_FILE.read_text(encoding="utf-8"))
+        updated = {**settings, "format": new_format, "format_footer": new_footer, "scope": SCOPE}
         number = WIDGET_ID.rsplit("-", 1)[1]
         response = client.put(
             f"{base}/wp-json/wp/v2/widgets/{WIDGET_ID}",
@@ -142,8 +153,9 @@ def main() -> int:
         response.raise_for_status()
         _, saved = read_instance(client, base)
         changed = sorted(key for key in set(settings) | set(saved)
-                         if key not in ("format", "scope") and settings.get(key) != saved.get(key))
-        if saved.get("format", "").strip() != new_format or saved.get("scope") != SCOPE:
+                         if key not in ("format", "format_footer", "scope") and settings.get(key) != saved.get(key))
+        if (saved.get("format", "").strip() != new_format or saved.get("scope") != SCOPE
+                or "csbw-events-widget:start" not in saved.get("format_footer", "")):
             raise ValueError("WordPress n'a pas enregistré la nouvelle mise en forme.")
         print(f"Mise en forme du widget mise à jour (période : {SCOPE}).")
         if changed:
