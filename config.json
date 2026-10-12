@@ -14,6 +14,8 @@
     "salle pierre albouy",
     "pierre albouy"
   ],
+  "home_venue": "Salle Pierre ALBOUY, 68310 WITTELSHEIM",
+  "home_default_time": "20:30",
   "wordpress_url": "https://www.csbw.fr",
   "events_manager_category_id": 9,
   "events_manager_home_location_id": 2,

@@ -9,8 +9,8 @@ from zoneinfo import ZoneInfo
 
 from scraper.demo import build_demo_result
 from scraper.icbad import BASE_URL, ICBadClient, discover_competitions, parse_matches, parse_teams
-from scraper.models import Competition, ScrapeResult
-from scraper.render import apply_overrides, render_ics
+from scraper.models import Competition, Match, ScrapeResult
+from scraper.render import apply_home_defaults, apply_overrides, render_ics
 from scraper.weekly_article import build_weekly_article, publish_wordpress
 from scraper.wordpress_events import (
     event_payload,
@@ -289,6 +289,31 @@ class ScraperTests(unittest.TestCase):
             apply_overrides(result, path)
         self.assertEqual({item.id for item in result.matches}, {"80001", "manual-1"})
         self.assertEqual(next(item for item in result.matches if item.id == "80001").venue, "Salle corrigée")
+
+    def test_home_match_without_time_or_venue_gets_the_hall_and_usual_time(self) -> None:
+        def match(match_id: str, start: datetime, venue: str | None, time_known: bool = True, is_home: bool = True):
+            return Match(
+                match_id, "t", "CSBW 9", "68-CSBW", "D3", 1, start, "CSBW 9", "Adversaire", "Adversaire",
+                is_home, venue, None, f"https://icbad.ffbad.org/rencontre/{match_id}", time_known=time_known,
+            )
+
+        hall = "Salle Pierre ALBOUY, 68310 WITTELSHEIM"
+        config = {"home_venue": hall, "home_default_time": "20:30", "home_venue_patterns": ["pierre albouy"]}
+        matches = [
+            match("1", datetime(2026, 10, 16, tzinfo=PARIS), None, time_known=False),
+            match("2", datetime(2026, 10, 25, 10, 0, tzinfo=PARIS), hall),
+            match("3", datetime(2026, 10, 25, tzinfo=PARIS), hall, time_known=False),
+            match("4", datetime(2026, 10, 30, tzinfo=PARIS), None, time_known=False, is_home=False),
+            match("5", datetime(2026, 11, 1, tzinfo=PARIS), "Halle des sports, 68950 REININGUE", time_known=False),
+        ]
+        result = ScrapeResult("2026-2027", datetime(2026, 8, 1, tzinfo=PARIS), "ready", matches=matches)
+        apply_home_defaults(result, config)
+        by_id = {item.id: item for item in result.matches}
+        self.assertEqual((by_id["1"].venue, by_id["1"].start.hour, by_id["1"].start.minute), (hall, 20, 30))
+        self.assertTrue(by_id["1"].time_known)
+        self.assertEqual((by_id["3"].start.hour, by_id["3"].time_known), (10, True))
+        self.assertEqual((by_id["4"].venue, by_id["4"].time_known), (None, False))
+        self.assertFalse(by_id["5"].time_known)
 
     def test_ics_contains_stable_event_ids(self) -> None:
         competition = Competition("2600200", "Interclubs Comité 68 D1", "https://icbad.ffbad.org/competition/2600200")
