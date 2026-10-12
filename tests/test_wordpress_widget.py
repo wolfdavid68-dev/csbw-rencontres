@@ -1,7 +1,7 @@
 import unittest
 from urllib.parse import parse_qs
 
-from scraper.wordpress_widget import form_data, php_unserialize
+from scraper.wordpress_widget import form_data, php_unserialize, widget_summary
 
 
 class WidgetTests(unittest.TestCase):
@@ -20,3 +20,9 @@ class WidgetTests(unittest.TestCase):
             {"widget-em_widget[10][title]": ["Interclub"], "widget-em_widget[10][limit]": ["5"],
              "widget-em_widget[10][all_events]": ["1"]},
         )
+
+    def test_widget_summary_shows_block_content(self):
+        widget = {"id": "block-3", "id_base": "block", "instance": {"raw": {"content": '<div id="csbw-manifestations-widget">Événements</div>'}}}
+        summary = widget_summary(widget)
+        self.assertIn("block-3", summary)
+        self.assertIn("csbw-manifestations-widget", summary)
