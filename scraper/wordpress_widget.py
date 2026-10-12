@@ -55,16 +55,45 @@ def php_unserialize(data: bytes) -> Any:
     return value
 
 
+def decode_instance(widget: dict[str, Any]) -> dict[str, Any]:
+    instance = widget.get("instance") or {}
+    if isinstance(instance.get("raw"), dict):
+        return instance["raw"]
+    if "encoded" not in instance:
+        raise ValueError("Réglages du widget illisibles.")
+    return php_unserialize(base64.b64decode(instance["encoded"]))
+
+
 def read_instance(client: requests.Session, base: str) -> tuple[dict[str, Any], dict[str, Any]]:
     response = client.get(f"{base}/wp-json/wp/v2/widgets/{WIDGET_ID}", params={"context": "edit"}, timeout=30)
     response.raise_for_status()
     widget = response.json()
-    instance = widget.get("instance") or {}
-    if isinstance(instance.get("raw"), dict):
-        return widget, instance["raw"]
-    if "encoded" not in instance:
-        raise ValueError("Réglages du widget illisibles.")
-    return widget, php_unserialize(base64.b64decode(instance["encoded"]))
+    return widget, decode_instance(widget)
+
+
+def widget_summary(widget: dict[str, Any]) -> str:
+    """One line per widget: where it sits, its title and the start of its content."""
+    try:
+        settings = decode_instance(widget)
+    except ValueError:
+        settings = {}
+    text = " ".join(str(settings.get(key) or "") for key in ("content", "text")).strip()
+    text = text or " ".join((widget.get("rendered") or "").split())
+    return (f"- {widget.get('id')} ({widget.get('id_base')}) titre={settings.get('title')!r} "
+            f"contenu={text[:300]!r}")
+
+
+def print_sidebars(client: requests.Session, base: str) -> None:
+    """List every widget area, inactive widgets included, to find a widget that left the page."""
+    response = client.get(f"{base}/wp-json/wp/v2/sidebars", params={"context": "edit"}, timeout=30)
+    response.raise_for_status()
+    widgets = client.get(f"{base}/wp-json/wp/v2/widgets", params={"context": "edit"}, timeout=30)
+    widgets.raise_for_status()
+    by_id = {widget["id"]: widget for widget in widgets.json()}
+    for sidebar in response.json():
+        print(f"Zone {sidebar.get('id')} ({sidebar.get('name')}, {sidebar.get('status')}) :")
+        for widget_id in sidebar.get("widgets") or []:
+            print(widget_summary(by_id[widget_id]) if widget_id in by_id else f"- {widget_id}")
 
 
 def form_data(number: str, settings: dict[str, Any]) -> str:
@@ -99,6 +128,7 @@ def main() -> int:
         print(f"Widget {WIDGET_ID} ({widget.get('id_base')}, zone {widget.get('sidebar')}) :")
         print(json.dumps(settings, ensure_ascii=False, indent=2))
         if not args.apply:
+            print_sidebars(client, base)
             return 0
 
         new_format = FORMAT_FILE.read_text(encoding="utf-8").strip()
