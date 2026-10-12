@@ -180,6 +180,7 @@ Le workflow du dimanche synchronise aussi le widget Events Manager intitulé « 
 - les rencontres à domicile et à l’extérieur sont incluses ;
 - les évènements sont classés dans la catégorie WordPress `Interclubs` ;
 - les rencontres à domicile utilisent l’emplacement `Salle Pierre Albouy`.
+- l’encadré « Événements » (deux prochains événements de manifestation.csbw.fr) est ajouté au-dessus de l’encadré Interclub par le script `templates/events-sidebar-widget.html`, enregistré dans le pied du widget Interclub par `Widget Interclub (mise en forme)` avec `apply` ; il ne dépend donc plus d’un article affiché sur l’accueil. En lecture seule, ce workflow liste aussi tous les widgets du site.
 
 Cette synchronisation nécessite l’API REST d’Events Manager, disponible à partir de la version 7.3. Le site utilise désormais la version 7.4.5 ; le test du 25 septembre 2026 confirme la connexion depuis GitHub et la lecture des sept événements de la semaine du 28 septembre. Les événements saisis manuellement sont reconnus par leur lien ICbad : leurs titres, descriptions et emplacements sont conservés lors des mises à jour. Si un même lien ICbad apparaît dans plusieurs événements, la synchronisation s’arrête pour éviter une modification ambiguë.
 
