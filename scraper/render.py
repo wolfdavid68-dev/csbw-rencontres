@@ -59,6 +59,40 @@ def apply_overrides(result: ScrapeResult, overrides_path: Path) -> None:
         result.status = "ready"
 
 
+def apply_home_defaults(result: ScrapeResult, config: dict) -> None:
+    """Fill what ICbad leaves blank for home matches: they are always played in the club hall at the usual time."""
+    home_venue = config.get("home_venue")
+    patterns = [pattern.casefold() for pattern in config.get("home_venue_patterns", ["salle pierre albouy"])]
+
+    def at_home_hall(match: Match) -> bool:
+        venue = (match.venue or "").casefold()
+        return match.is_home and any(pattern in venue for pattern in patterns)
+
+    for match in result.matches:
+        if match.is_home and not match.venue and home_venue:
+            match.venue = home_venue
+
+    default_time = config.get("home_default_time")
+    for match in result.matches:
+        if match.time_known or not at_home_hall(match):
+            continue
+        # Another match at the hall the same day gives the evening's time; otherwise the usual one.
+        same_day = sorted(
+            other.start.time() for other in result.matches
+            if other.time_known and at_home_hall(other) and other.start.date() == match.start.date()
+        )
+        if same_day:
+            start_time = same_day[0]
+        elif default_time:
+            start_time = datetime.strptime(default_time, "%H:%M").time()
+        else:
+            continue
+        match.start = match.start.replace(hour=start_time.hour, minute=start_time.minute)
+        match.time_known = True
+
+    result.matches.sort(key=lambda item: (item.start, item.team, item.id))
+
+
 def _ics_escape(value: str | None) -> str:
     return (value or "").replace("\\", "\\\\").replace(";", "\\;").replace(",", "\\,").replace("\n", "\\n")
 

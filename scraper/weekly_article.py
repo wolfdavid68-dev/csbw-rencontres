@@ -19,7 +19,7 @@ from requests.auth import HTTPBasicAuth
 from .demo import build_demo_result
 from .icbad import ICBadClient, normalize
 from .models import Match, ScrapeResult
-from .render import apply_overrides
+from .render import apply_home_defaults, apply_overrides
 from .wordpress_events import sync_events_manager_week
 
 
@@ -398,6 +398,7 @@ def main() -> int:
             result = ICBadClient(config, no_delay=args.no_delay).scrape(season)
             overrides_path = PROJECT_ROOT / config.get("manual_overrides_file", "overrides.json")
             apply_overrides(result, overrides_path)
+            apply_home_defaults(result, config)
         article = build_weekly_article(
             result,
             week_start,

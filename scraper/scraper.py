@@ -8,7 +8,7 @@ from pathlib import Path
 
 from .demo import build_demo_result
 from .icbad import ICBadClient
-from .render import apply_overrides, write_outputs
+from .render import apply_home_defaults, apply_overrides, write_outputs
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -44,6 +44,7 @@ def main() -> int:
         else:
             result = ICBadClient(config, no_delay=args.no_delay).scrape(season)
             apply_overrides(result, overrides_path)
+            apply_home_defaults(result, config)
             render_config = config
         write_outputs(result, output_dir, PROJECT_ROOT / "templates", render_config)
         logo_source = PROJECT_ROOT / "assets" / "csbw-192.png"

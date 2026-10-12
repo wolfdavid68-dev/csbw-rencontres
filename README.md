@@ -83,6 +83,8 @@ Ajout manuel compact :
 
 Pour masquer une rencontre ICbad, ajouter son identifiant dans `delete`. L’identifiant se trouve dans `rencontres.json` ou à la fin de l’URL ICbad.
 
+Les rencontres à domicile se jouent toujours à la même heure dans la même salle. Lorsqu’ICbad ne publie pas encore l’horaire ou le lieu d’une rencontre à domicile, le calendrier, l’article et le widget utilisent `home_venue` et l’heure des autres rencontres du même jour dans la salle, sinon `home_default_time` (`20:30`), réglés dans `config.json`. Les rencontres à l’extérieur restent « Horaire à confirmer ».
+
 ## Publication gratuite sur GitHub Pages
 
 Le dossier est conçu pour devenir la racine d’un dépôt GitHub séparé.
