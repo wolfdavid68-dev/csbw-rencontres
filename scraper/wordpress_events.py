@@ -267,6 +267,17 @@ def sync_events_manager_week(
                 check_write(client.post(endpoint, json=payload, timeout=30), f"Creation de {match.id}")
             created += 1
 
+    # A match moved to another week leaves our event behind: trash it, the other week's sync recreates it.
+    selected_ids = {match.id for match in selected}
+    known_ids = {match.id for match in matches}
+    moved = 0
+    for synced_id, event in existing.items():
+        if synced_id in selected_ids or synced_id not in known_ids or not SYNC_MARKER.search(event_content(event)):
+            continue
+        if not dry_run:
+            check_write(client.delete(f"{endpoint}/{event['id']}", timeout=30), f"Corbeille de {event['id']}")
+        moved += 1
+
     return {
         "action": "dry_run" if dry_run else "synced",
         "week_start": week_start.isoformat(),
@@ -275,6 +286,7 @@ def sync_events_manager_week(
         "created": created,
         "updated": updated,
         "recreated": recreated,
+        "moved": moved,
     }
 
 
@@ -318,12 +330,14 @@ def main() -> int:
     elif result["action"] == "dry_run":
         print(
             f"Simulation sans modification: {result['matches']} rencontre(s), "
-            f"{result['created']} a creer, {result['updated']} deja presente(s), {result['recreated']} a recreer (heure modifiee)."
+            f"{result['created']} a creer, {result['updated']} deja presente(s), {result['recreated']} a recreer (heure modifiee), "
+            f"{result['moved']} a retirer (deplacee(s) dans une autre semaine)."
         )
     else:
         print(
             f"Bloc Interclub synchronise: {result['matches']} rencontre(s), "
-            f"{result['created']} creee(s), {result['updated']} mise(s) a jour, {result['recreated']} recreee(s) a la nouvelle heure."
+            f"{result['created']} creee(s), {result['updated']} mise(s) a jour, {result['recreated']} recreee(s) a la nouvelle heure, "
+            f"{result['moved']} retiree(s) car deplacee(s) dans une autre semaine."
         )
     return 0
 

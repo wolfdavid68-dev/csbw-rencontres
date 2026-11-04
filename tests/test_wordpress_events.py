@@ -137,6 +137,23 @@ class EventSyncTests(unittest.TestCase):
         self.assertEqual(self.sync(session, dry_run=True)["recreated"], 1)
         self.assertEqual(session.writes, [])
 
+    def test_match_moved_to_another_week_is_trashed(self):
+        stored = self.synced_event({"all_day": False, "start_date": "2026-09-04", "start_time": "20:30:00"})
+        self.match.start = datetime.fromisoformat("2026-09-11T20:30:00+02:00")
+        session = Session([stored])
+        self.assertEqual(self.sync(session, dry_run=True)["moved"], 1)
+        self.assertEqual(session.writes, [])
+        result = self.sync(session)
+        self.assertEqual((result["created"], result["moved"]), (0, 1))
+        self.assertEqual([write[:2] for write in session.writes], [("delete", "https://www.csbw.fr/wp-json/events-manager/v1/events/1250")])
+
+    def test_unknown_or_manual_events_outside_the_season_list_are_kept(self):
+        self.match.start = datetime.fromisoformat("2026-09-11T20:30:00+02:00")
+        other = {**self.synced_event({}), "content": '<p title="CSBW_SYNC:manual-x">Ajout</p>'}
+        session = Session([other, self.event])
+        self.assertEqual(self.sync(session)["moved"], 0)
+        self.assertEqual(session.writes, [])
+
     def test_wordpress_error_message_is_reported(self):
         class Refused(Response):
             status_code = 503
