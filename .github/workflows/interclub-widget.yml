@@ -8,6 +8,11 @@ on:
         required: false
         default: false
         type: boolean
+      sync_week:
+        description: "Resynchroniser les rencontres ICbad de la semaine du lundi indiqué (AAAA-MM-JJ, sans toucher à l'article ; simulation sans apply)"
+        required: false
+        default: ""
+        type: string
 
 permissions:
   contents: read
@@ -33,4 +38,19 @@ jobs:
             python -m scraper.wordpress_widget --apply
           else
             python -m scraper.wordpress_widget
+          fi
+      - name: Resynchroniser les rencontres de la semaine
+        if: ${{ inputs.sync_week != '' }}
+        env:
+          WP_URL: https://www.csbw.fr
+          WP_USERNAME: ${{ secrets.WP_USERNAME }}
+          WP_APPLICATION_PASSWORD: ${{ secrets.WP_APPLICATION_PASSWORD }}
+          APPLY: ${{ inputs.apply }}
+          SYNC_WEEK: ${{ inputs.sync_week }}
+        run: |
+          python -m scraper.scraper
+          if [ "$APPLY" = "true" ]; then
+            python -m scraper.wordpress_events --week-start "$SYNC_WEEK"
+          else
+            python -m scraper.wordpress_events --week-start "$SYNC_WEEK" --dry-run
           fi
