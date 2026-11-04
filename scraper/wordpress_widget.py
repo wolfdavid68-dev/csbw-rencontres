@@ -25,6 +25,8 @@ EVENTS_FILE = PROJECT_ROOT / "templates" / "events-sidebar-widget.html"
 EVENTS_BLOCK = re.compile(r"\n*<!-- csbw-events-widget:start -->.*?<!-- csbw-events-widget:end -->", re.S)
 # The whole Monday-to-Sunday week, so matches already played stay listed until Sunday.
 SCOPE = "week"
+# Enough for a busy week: a regional Sunday alone holds six matches (morning and afternoon).
+LIMIT = 30
 
 
 def php_unserialize(data: bytes) -> Any:
@@ -120,7 +122,7 @@ def with_events_block(footer: str, block: str) -> str:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Lit ou met à jour le widget Interclub de WordPress.")
-    parser.add_argument("--apply", action="store_true", help="Remplacer la mise en forme, la période et l'encadré Événements par ceux du projet.")
+    parser.add_argument("--apply", action="store_true", help="Remplacer la mise en forme, la période, le nombre de rencontres et l'encadré Événements par ceux du projet.")
     args = parser.parse_args()
 
     username = os.environ.get("WP_USERNAME", "")
@@ -143,7 +145,7 @@ def main() -> int:
 
         new_format = FORMAT_FILE.read_text(encoding="utf-8").strip()
         new_footer = with_events_block(settings.get("format_footer") or "", EVENTS_FILE.read_text(encoding="utf-8"))
-        updated = {**settings, "format": new_format, "format_footer": new_footer, "scope": SCOPE}
+        updated = {**settings, "format": new_format, "format_footer": new_footer, "scope": SCOPE, "limit": LIMIT}
         number = WIDGET_ID.rsplit("-", 1)[1]
         response = client.put(
             f"{base}/wp-json/wp/v2/widgets/{WIDGET_ID}",
@@ -153,11 +155,12 @@ def main() -> int:
         response.raise_for_status()
         _, saved = read_instance(client, base)
         changed = sorted(key for key in set(settings) | set(saved)
-                         if key not in ("format", "format_footer", "scope") and settings.get(key) != saved.get(key))
+                         if key not in ("format", "format_footer", "scope", "limit") and settings.get(key) != saved.get(key))
         if (saved.get("format", "").strip() != new_format or saved.get("scope") != SCOPE
+                or str(saved.get("limit")) != str(LIMIT)
                 or "csbw-events-widget:start" not in saved.get("format_footer", "")):
             raise ValueError("WordPress n'a pas enregistré la nouvelle mise en forme.")
-        print(f"Mise en forme du widget mise à jour (période : {SCOPE}).")
+        print(f"Mise en forme du widget mise à jour (période : {SCOPE}, jusqu'à {LIMIT} rencontres).")
         if changed:
             print(f"Autres réglages modifiés par WordPress : {', '.join(changed)}")
     except Exception as error:
