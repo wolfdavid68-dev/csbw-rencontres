@@ -19,10 +19,13 @@ from requests.auth import HTTPBasicAuth
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 WIDGET_ID = "em_widget-10"
 FORMAT_FILE = PROJECT_ROOT / "templates" / "interclub-widget-format.html"
-# The "Événements" box is built by this script; kept in the Interclub footer so every page with the
-# sidebar shows it, instead of depending on a post still being listed on the homepage.
-EVENTS_FILE = PROJECT_ROOT / "templates" / "events-sidebar-widget.html"
-EVENTS_BLOCK = re.compile(r"\n*<!-- csbw-events-widget:start -->.*?<!-- csbw-events-widget:end -->", re.S)
+# Scripts kept in the Interclub footer so every page with the sidebar runs them, instead of depending on
+# a post still being listed on the homepage: the "Événements" box and the cheese sale popup.
+# Deleting a template removes its block from the footer at the next --apply.
+MANAGED_BLOCKS = {
+    "csbw-events-widget": PROJECT_ROOT / "templates" / "events-sidebar-widget.html",
+    "csbw-fromage-popup": PROJECT_ROOT / "templates" / "fromage-popup.html",
+}
 # The whole Monday-to-Sunday week, so matches already played stay listed until Sunday.
 SCOPE = "week"
 
@@ -113,14 +116,22 @@ def form_data(number: str, settings: dict[str, Any]) -> str:
     return urlencode(fields)
 
 
-def with_events_block(footer: str, block: str) -> str:
-    """Replace the managed events block in the footer, or append it once."""
-    return EVENTS_BLOCK.sub("", footer).rstrip() + "\n\n" + block.strip()
+def with_block(footer: str, name: str, block: str | None) -> str:
+    """Replace the managed block called name in the footer, append it once, or remove it when block is None."""
+    pattern = re.compile(rf"\n*<!-- {re.escape(name)}:start -->.*?<!-- {re.escape(name)}:end -->", re.S)
+    footer = pattern.sub("", footer).rstrip()
+    return footer + "\n\n" + block.strip() if block else footer
+
+
+def with_managed_blocks(footer: str) -> str:
+    for name, path in MANAGED_BLOCKS.items():
+        footer = with_block(footer, name, path.read_text(encoding="utf-8") if path.exists() else None)
+    return footer
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Lit ou met à jour le widget Interclub de WordPress.")
-    parser.add_argument("--apply", action="store_true", help="Remplacer la mise en forme, la période et l'encadré Événements par ceux du projet.")
+    parser.add_argument("--apply", action="store_true", help="Remplacer la mise en forme, la période et les scripts (Événements, popup) par ceux du projet.")
     args = parser.parse_args()
 
     username = os.environ.get("WP_USERNAME", "")
@@ -142,7 +153,7 @@ def main() -> int:
             return 0
 
         new_format = FORMAT_FILE.read_text(encoding="utf-8").strip()
-        new_footer = with_events_block(settings.get("format_footer") or "", EVENTS_FILE.read_text(encoding="utf-8"))
+        new_footer = with_managed_blocks(settings.get("format_footer") or "")
         updated = {**settings, "format": new_format, "format_footer": new_footer, "scope": SCOPE}
         number = WIDGET_ID.rsplit("-", 1)[1]
         response = client.put(
@@ -154,8 +165,9 @@ def main() -> int:
         _, saved = read_instance(client, base)
         changed = sorted(key for key in set(settings) | set(saved)
                          if key not in ("format", "format_footer", "scope") and settings.get(key) != saved.get(key))
+        expected = [name for name, path in MANAGED_BLOCKS.items() if path.exists()]
         if (saved.get("format", "").strip() != new_format or saved.get("scope") != SCOPE
-                or "csbw-events-widget:start" not in saved.get("format_footer", "")):
+                or any(f"{name}:start" not in saved.get("format_footer", "") for name in expected)):
             raise ValueError("WordPress n'a pas enregistré la nouvelle mise en forme.")
         print(f"Mise en forme du widget mise à jour (période : {SCOPE}).")
         if changed:
