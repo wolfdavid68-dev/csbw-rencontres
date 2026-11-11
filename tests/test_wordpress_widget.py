@@ -1,7 +1,7 @@
 import unittest
 from urllib.parse import parse_qs
 
-from scraper.wordpress_widget import form_data, php_unserialize, widget_summary, with_events_block
+from scraper.wordpress_widget import form_data, php_unserialize, widget_summary, with_block, MANAGED_BLOCKS
 
 
 class WidgetTests(unittest.TestCase):
@@ -29,10 +29,26 @@ class WidgetTests(unittest.TestCase):
 
     def test_events_block_is_appended_once_and_replaced(self):
         block = "<!-- csbw-events-widget:start -->\n<script>v1</script>\n<!-- csbw-events-widget:end -->"
-        footer = with_events_block("</ul>\n<script>tri</script>", block)
+        footer = with_block("</ul>\n<script>tri</script>", "csbw-events-widget", block)
         self.assertEqual(footer, "</ul>\n<script>tri</script>\n\n" + block)
-        updated = with_events_block(footer, block.replace("v1", "v2"))
+        updated = with_block(footer, "csbw-events-widget", block.replace("v1", "v2"))
         self.assertEqual(updated.count("csbw-events-widget:start"), 1)
         self.assertIn("v2", updated)
         self.assertNotIn("v1", updated)
         self.assertTrue(updated.startswith("</ul>\n<script>tri</script>"))
+
+    def test_other_blocks_are_kept_and_a_missing_template_is_removed(self):
+        events = "<!-- csbw-events-widget:start -->\n<script>e</script>\n<!-- csbw-events-widget:end -->"
+        popup = "<!-- csbw-fromage-popup:start -->\n<script>p</script>\n<!-- csbw-fromage-popup:end -->"
+        footer = with_block(with_block("</ul>", "csbw-events-widget", events), "csbw-fromage-popup", popup)
+        self.assertEqual(footer, "</ul>\n\n" + events + "\n\n" + popup)
+        self.assertEqual(with_block(footer, "csbw-fromage-popup", None), "</ul>\n\n" + events)
+
+    def test_popup_template_survives_the_widget_format(self):
+        # WordPress may strip backslashes and Events Manager reads "#x" as a placeholder: keep both out.
+        block = MANAGED_BLOCKS["csbw-fromage-popup"].read_text(encoding="utf-8")
+        script = block.split("<script>", 1)[1].split("</script>", 1)[0]
+        self.assertNotIn("\\", script)
+        self.assertNotIn("#", script)
+        self.assertNotIn("<", script)
+        self.assertEqual(len(script.splitlines()), 1)
