@@ -7,6 +7,20 @@
       "start": "2026-10-06T20:30:00+02:00",
       "time_known": true,
       "venue": "Halle des Sports, 10 Place Halle des Sports, 68800 THANN"
+    },
+    {
+      "id": "784140",
+      "season": "2026-2027",
+      "start": "2026-11-20T20:30:00+01:00",
+      "time_known": true,
+      "venue": "Gymnase du Grillenbreit, 68000 Colmar"
+    },
+    {
+      "id": "784356",
+      "season": "2026-2027",
+      "start": "2026-11-20T20:30:00+01:00",
+      "time_known": true,
+      "venue": "Gymnase Kléber, 68100 Mulhouse"
     }
   ]
 }
