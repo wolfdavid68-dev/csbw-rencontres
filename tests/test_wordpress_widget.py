@@ -44,6 +44,12 @@ class WidgetTests(unittest.TestCase):
         self.assertEqual(footer, "</ul>\n\n" + events + "\n\n" + popup)
         self.assertEqual(with_block(footer, "csbw-fromage-popup", None), "</ul>\n\n" + events)
 
+    def test_away_matches_show_the_hall_or_exterieur(self):
+        from scraper.wordpress_widget import FORMAT_FILE
+        widget_format = FORMAT_FILE.read_text(encoding="utf-8")
+        self.assertIn("{no_location}🚗 {has_att_salle}#_ATT{salle}{/has_att_salle}"
+                      "{no_att_salle}Extérieur{/no_att_salle}{/no_location}", widget_format)
+
     def test_popup_template_survives_the_widget_format(self):
         # WordPress may strip backslashes and Events Manager reads "#x" as a placeholder: keep both out.
         block = MANAGED_BLOCKS["csbw-fromage-popup"].read_text(encoding="utf-8")

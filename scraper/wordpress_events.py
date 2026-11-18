@@ -57,6 +57,20 @@ def event_name(event: dict[str, Any]) -> str:
     return html.unescape(str(value)).strip()
 
 
+def short_venue(venue: str) -> str:
+    """Hall and town for the widget: "Salle La Palestre, 68130 ALTKIRCH" -> "Salle La Palestre, Altkirch"."""
+    name, _, place = venue.rpartition(",")
+    if not name:
+        name, place = venue, ""
+    name = name.strip()
+    town = re.sub(r"^\d{5}\s*", "", place.strip())
+    if name.isupper():
+        name = name.title()
+    if town.isupper():
+        town = town.title()
+    return f"{name}, {town}" if town else name
+
+
 def event_payload(
     match: Match,
     category_id: int,
@@ -107,6 +121,10 @@ def event_payload(
         and (not match.venue or any(pattern.casefold() in venue_lower for pattern in home_venue_patterns))
     ):
         payload["location_id"] = home_location_id
+    elif match.venue:
+        # Shown by the Interclub widget for events without an Events Manager location (#_ATT{salle}).
+        # Events Manager stores it only once "#_ATT{salle}" is declared under Events > Settings > Attributes.
+        payload["em_attributes"]["salle"] = short_venue(match.venue)
     return payload
 
 

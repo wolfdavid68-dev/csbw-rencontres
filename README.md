@@ -180,6 +180,7 @@ Le workflow du dimanche synchronise aussi le widget Events Manager intitulé « 
 - les rencontres à domicile et à l’extérieur sont incluses ;
 - les évènements sont classés dans la catégorie WordPress `Interclubs` ;
 - les rencontres à domicile utilisent l’emplacement `Salle Pierre Albouy`.
+- les rencontres sans emplacement (à l’extérieur) affichent la salle, par exemple « 🚗 Gymnase du Grillenbreit, Colmar », enregistrée dans l’attribut d’événement `salle` ; à défaut, « 🚗 Extérieur ». Events Manager n’enregistre cet attribut que s’il est déclaré : ligne `#_ATT{salle}` dans Événements → Réglages → Général → Attributs d’événement (attributs activés).
 - l’encadré « Événements » (deux prochains événements de manifestation.csbw.fr) est ajouté au-dessus de l’encadré Interclub par le script `templates/events-sidebar-widget.html`, enregistré dans le pied du widget Interclub par `Widget Interclub (mise en forme)` avec `apply` ; il ne dépend donc plus d’un article affiché sur l’accueil. En lecture seule, ce workflow liste aussi tous les widgets du site.
 - le popup de la vente de fromages (`templates/fromage-popup.html`) est enregistré au même endroit : il s’affiche une fois par jour et par visiteur, sauf sur l’article de la vente, et disparaît de lui-même après la date limite des commandes (mardi 24 novembre 2026 à 23 h 59). Pour le retirer plus tôt, supprimer ce fichier puis relancer `Widget Interclub (mise en forme)` avec `apply`.
 

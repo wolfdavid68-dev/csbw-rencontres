@@ -2,7 +2,7 @@ from datetime import date, datetime
 import unittest
 
 from scraper.demo import build_demo_result
-from scraper.wordpress_events import marker_id, sync_events_manager_week
+from scraper.wordpress_events import event_payload, marker_id, short_venue, sync_events_manager_week
 
 
 class Response:
@@ -155,6 +155,30 @@ class EventSyncTests(unittest.TestCase):
             session = Session([event])
             self.sync(session)
             self.assertEqual([write[0] for write in session.writes], ["patch"])
+
+    def test_away_hall_is_sent_as_salle_attribute(self):
+        self.assertEqual(short_venue("Salle La Palestre, 68130 ALTKIRCH"), "Salle La Palestre, Altkirch")
+        self.assertEqual(short_venue("ESPACE 2000, 68870 BARTENHEIM"), "Espace 2000, Bartenheim")
+        self.assertEqual(short_venue("Gymnase du Grillenbreit, 68000 Colmar"), "Gymnase du Grillenbreit, Colmar")
+        self.assertEqual(short_venue("Gymnase Kléber"), "Gymnase Kléber")
+
+        self.match.is_home = False
+        self.match.venue = "Gymnase du Grillenbreit, 68000 Colmar"
+        payload = event_payload(self.match, 9, 2, ["pierre albouy"])
+        self.assertNotIn("location_id", payload)
+        self.assertEqual(payload["em_attributes"]["salle"], "Gymnase du Grillenbreit, Colmar")
+        self.assertEqual(payload["em_attributes"]["badnet"], self.match.source_url)
+
+        # Existing events get the attribute too, even when their description is kept.
+        session = Session([self.event])
+        self.sync(session)
+        self.assertEqual(session.writes[0][2]["em_attributes"]["salle"], "Gymnase du Grillenbreit, Colmar")
+
+        self.match.is_home = True
+        self.match.venue = "Salle Pierre ALBOUY, 68310 WITTELSHEIM"
+        payload = event_payload(self.match, 9, 2, ["pierre albouy"])
+        self.assertEqual(payload["location_id"], 2)
+        self.assertNotIn("salle", payload["em_attributes"])
 
     def test_content_formats_and_ambiguous_links(self):
         self.assertEqual(marker_id({"content": {"rendered": self.event["content"]}}), "782029")
