@@ -51,7 +51,9 @@ class WidgetTests(unittest.TestCase):
         self.assertNotIn("#_EVENTTIMES", widget_format)  # The end time is a placeholder (start + 3 h).
         self.assertIn(">Domicile</span>#_LOCATIONNAME{/has_location}", widget_format)
         self.assertIn('>Extérieur</span>{has_att_salle}<span class="csbw-ic-salle">#_ATT{salle}</span>', widget_format)
-        self.assertIn('data-csbw-date="#_{Y-m-d}" data-csbw-title="#_EVENTNAME"', widget_format)
+        self.assertIn('data-csbw-date="#_{Y-m-d}" data-csbw-time="{has_time}#_{H}#_{i}{/has_time}" '
+                      'data-csbw-title="#_EVENTNAME"', widget_format)
+        self.assertEqual(widget_format.count("font-style:normal"), 2)  # The theme sets times and places in italics.
         self.assertNotIn("\\", widget_format)
 
     def test_footer_scripts_survive_the_widget_format(self):
