@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import html
 import json
 import os
@@ -9,6 +10,7 @@ import sys
 from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any
+from urllib.parse import quote_plus
 from zoneinfo import ZoneInfo
 
 import requests
@@ -21,6 +23,18 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 SYNC_MARKER = re.compile(r"CSBW_SYNC:([^:\"']+)")
 UNKNOWN_VENUE = "Lieu à confirmer"
 ICBAD_LINK = re.compile(r"https?://icbad\.ffbad\.org/rencontre/(\d+)(?=[/\s\"'<>?#]|$)")
+# Content written by this script: the fingerprint tells an untouched page (safe to rewrite) from a page
+# a volunteer edited (kept as is).
+GENERATED = re.compile(r'^<div data-csbw-auto="([0-9a-f]{12})">(.*)</div>$', re.S)
+# Content of the first versions of the script, rewritten in the new layout.
+LEGACY_CONTENT = re.compile(
+    r"^<p><strong>Rencontre d’interclub</strong><br>[^<]*<br>📍 [^<]*</p>\s*"
+    r'<p><a href="[^"]*" title="CSBW_SYNC:[^"]+">Voir la fiche ICbad</a></p>$'
+)
+BRAND = "#d70100"
+WEEKDAYS = ["lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche"]
+MONTHS = ["janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août",
+          "septembre", "octobre", "novembre", "décembre"]
 
 
 def sidebar_week_start(now: datetime) -> date:
@@ -66,9 +80,92 @@ def short_venue(venue: str) -> str:
     town = re.sub(r"^\d{5}\s*", "", place.strip())
     if name.isupper():
         name = name.title()
-    if town.isupper():
+    if town.isupper() or town.islower():
         town = town.title()
+    if town and name.casefold().endswith(town.casefold()):
+        return name  # "CSL - Quai Heydt - Ostwald, 67540 ostwald" names the town already.
     return f"{name}, {town}" if town else name
+
+
+def venue_town(venue: str | None) -> str:
+    """Town of an ICbad venue: "CSL - Quai Heydt - Ostwald, 67540 ostwald" -> "Ostwald"."""
+    if not venue or "," not in venue:
+        return ""
+    town = re.sub(r"^\d{5}\s*", "", venue.rpartition(",")[2].strip())
+    return town.title() if town.isupper() or town.islower() else town
+
+
+def is_home_hall(match: Match, home_venue_patterns: list[str]) -> bool:
+    """Played in the club's own hall (a home match without a venue yet is played there)."""
+    venue = (match.venue or "").casefold()
+    return not venue or any(pattern.casefold() in venue for pattern in home_venue_patterns)
+
+
+def place_label(match: Match, home_venue_patterns: list[str]) -> str:
+    """Badge text: "Domicile", "Extérieur", or "Reçoit à Ostwald" when the CSBW hosts in another hall."""
+    if not match.is_home:
+        return "Extérieur"
+    if is_home_hall(match, home_venue_patterns):
+        return "Domicile"
+    town = venue_town(match.venue)
+    return f"Reçoit à {town}" if town else "Reçoit"
+
+
+def match_day_label(match: Match) -> str:
+    day = f"{WEEKDAYS[match.start.weekday()].capitalize()} {match.start.day} {MONTHS[match.start.month - 1]}"
+    time = f"{match.start.hour}h{match.start.minute:02d}" if match.time_known else "horaire à confirmer"
+    return f"{day} · {time}"
+
+
+def fingerprint(body: str) -> str:
+    return hashlib.sha1(body.encode("utf-8")).hexdigest()[:12]
+
+
+def is_generated_content(content: str) -> bool:
+    """True for a page written by this script and left untouched since."""
+    content = content.strip()
+    if LEGACY_CONTENT.match(content):
+        return True
+    found = GENERATED.match(content)
+    return bool(found and fingerprint(found.group(2)) == found.group(1))
+
+
+def event_content_html(match: Match, home_venue_patterns: list[str]) -> str:
+    """Event page: date and time first, both teams, a place badge, the hall and the useful links."""
+    e = html.escape
+    place = place_label(match, home_venue_patterns)
+    badge_style = {
+        "Domicile": f"background:{BRAND};color:#fff;",
+        "Extérieur": "background:#e8e8e8;color:#555;",
+    }.get(place, "background:#fff1d6;color:#8a5a00;")
+    round_label = f" · J{match.round_number}" if match.round_number else ""
+    venue = e(match.venue) if match.venue else UNKNOWN_VENUE
+    source_url = e(match.source_url, quote=True)
+    button = ("display:inline-block;margin:0 6px 8px 0;padding:10px 14px;border-radius:3px;"
+              "font-weight:500;text-decoration:none;text-transform:uppercase;font-size:13px;")
+    links = []
+    if match.venue:
+        maps = e("https://www.google.com/maps/search/?api=1&query=" + quote_plus(match.venue), quote=True)
+        links.append(f'<a href="{maps}" style="{button}background:{BRAND};color:#fff;">🧭 Itinéraire</a>')
+    links.append(
+        f'<a href="{source_url}" title="CSBW_SYNC:{e(match.id, quote=True)}" '
+        f'style="{button}border:1px solid #ccc;color:#444;">Voir la fiche ICbad</a>'
+    )
+    body = (
+        f'<div style="background:{BRAND};color:#fff;padding:12px 14px;border-radius:3px;margin:0 0 14px;">'
+        f'<div style="font-size:12px;text-transform:uppercase;letter-spacing:.5px;opacity:.85;">'
+        f"Rencontre d’interclub{round_label}</div>"
+        f'<div style="font-size:20px;font-weight:700;line-height:1.3;">{e(match_day_label(match))}</div></div>\n'
+        f'<p style="text-align:center;font-size:18px;font-weight:700;line-height:1.35;margin:0 0 8px;">'
+        f'{e(match.team)} <span style="color:#999;font-size:13px;font-weight:400;">vs</span> {e(match.opponent)}</p>\n'
+        f'<p style="text-align:center;margin:0 0 14px;"><span style="{badge_style}display:inline-block;'
+        f'padding:2px 8px;border-radius:3px;font-size:11px;font-weight:700;text-transform:uppercase;">'
+        f"{e(place)}</span></p>\n"
+        f'<p style="margin:0 0 6px;">📍 <strong>{venue}</strong></p>\n'
+        f'<p style="margin:0 0 14px;">🏆 {e(match.division)}</p>\n'
+        f'<p style="margin:0;">{"".join(links)}</p>'
+    )
+    return f'<div data-csbw-auto="{fingerprint(body)}">{body}</div>'
 
 
 def event_payload(
@@ -77,17 +174,10 @@ def event_payload(
     home_location_id: int | None,
     home_venue_patterns: list[str],
 ) -> dict[str, Any]:
+    # Events Manager needs an end time; the widget and the page only show the start.
     end = match.start + timedelta(hours=3)
     title = event_title(match)
-    venue = html.escape(match.venue) if match.venue else UNKNOWN_VENUE
-    source_url = html.escape(match.source_url, quote=True)
-    content = (
-        f"<p><strong>Rencontre d’interclub</strong><br>"
-        f"{html.escape(match.division)}<br>"
-        f"📍 {venue}</p>\n"
-        f'<p><a href="{source_url}" title="CSBW_SYNC:{html.escape(match.id, quote=True)}">'
-        "Voir la fiche ICbad</a></p>"
-    )
+    content = event_content_html(match, home_venue_patterns)
     payload: dict[str, Any] = {
         "event_name": title,
         "content": content,
@@ -104,7 +194,8 @@ def event_payload(
         "event_active_status": 1,
         "event_private": 0,
         "event_categories": [category_id],
-        "em_attributes": {"badnet": match.source_url},
+        # The theme turns a "badnet" link into "- Inscriptions sur Badnet", meant for tournaments.
+        "em_attributes": {"badnet": ""},
     }
     if not match.time_known:
         # Keep the match on its day until ICbad publishes the time.
@@ -114,12 +205,7 @@ def event_payload(
             "event_end_time": "23:59:59",
             "event_all_day": 1,
         })
-    venue_lower = (match.venue or "").casefold()
-    if (
-        match.is_home
-        and home_location_id is not None
-        and (not match.venue or any(pattern.casefold() in venue_lower for pattern in home_venue_patterns))
-    ):
+    if match.is_home and home_location_id is not None and is_home_hall(match, home_venue_patterns):
         payload["location_id"] = home_location_id
     elif match.venue:
         # Shown by the Interclub widget for events without an Events Manager location (#_ATT{salle}).
@@ -257,7 +343,8 @@ def sync_events_manager_week(
             preserved = []
             if event_name(current) not in (legacy_title(match), event_title(match)):
                 preserved.append("event_name")
-            if not (SYNC_MARKER.search(content) and UNKNOWN_VENUE in html.unescape(content)):
+            placeholder = SYNC_MARKER.search(content) and UNKNOWN_VENUE in html.unescape(content)
+            if not (placeholder or is_generated_content(content)):
                 preserved += ["content", "location_id"]
             stored = event_schedule(current)
             if SYNC_MARKER.search(content) and stored is not None and stored != payload_schedule(payload):

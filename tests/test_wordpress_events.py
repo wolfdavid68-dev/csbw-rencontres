@@ -2,7 +2,9 @@ from datetime import date, datetime
 import unittest
 
 from scraper.demo import build_demo_result
-from scraper.wordpress_events import event_payload, marker_id, short_venue, sync_events_manager_week
+from scraper.wordpress_events import (
+    event_payload, is_generated_content, marker_id, place_label, short_venue, sync_events_manager_week,
+)
 
 
 class Response:
@@ -161,13 +163,16 @@ class EventSyncTests(unittest.TestCase):
         self.assertEqual(short_venue("ESPACE 2000, 68870 BARTENHEIM"), "Espace 2000, Bartenheim")
         self.assertEqual(short_venue("Gymnase du Grillenbreit, 68000 Colmar"), "Gymnase du Grillenbreit, Colmar")
         self.assertEqual(short_venue("Gymnase Kléber"), "Gymnase Kléber")
+        self.assertEqual(short_venue("Halle des sports, 68310 wittelsheim"), "Halle des sports, Wittelsheim")
+        self.assertEqual(short_venue("CSL - Quai Heydt - Ostwald, 67540 ostwald"), "CSL - Quai Heydt - Ostwald")
 
         self.match.is_home = False
         self.match.venue = "Gymnase du Grillenbreit, 68000 Colmar"
         payload = event_payload(self.match, 9, 2, ["pierre albouy"])
         self.assertNotIn("location_id", payload)
         self.assertEqual(payload["em_attributes"]["salle"], "Gymnase du Grillenbreit, Colmar")
-        self.assertEqual(payload["em_attributes"]["badnet"], self.match.source_url)
+        # The theme shows a non-empty "badnet" link as "- Inscriptions sur Badnet" (tournaments only).
+        self.assertEqual(payload["em_attributes"]["badnet"], "")
 
         # Existing events get the attribute too, even when their description is kept.
         session = Session([self.event])
@@ -185,6 +190,54 @@ class EventSyncTests(unittest.TestCase):
         self.assertEqual(marker_id({"content": 'title="CSBW_SYNC:manual-1"'}), "manual-1")
         with self.assertRaises(ValueError):
             marker_id({"content": self.event["content"] + ' https://icbad.ffbad.org/rencontre/99999'})
+
+    def test_page_shows_date_time_teams_and_place(self):
+        self.match.is_home = True
+        self.match.venue = "CSL - Quai Heydt - Ostwald, 67540 ostwald"
+        content = event_payload(self.match, 9, 2, ["pierre albouy"])["content"]
+        self.assertIn("4 septembre · 20h30", content)
+        self.assertIn(f"{self.match.team} <span", content)
+        self.assertIn("Reçoit à Ostwald", content)
+        self.assertIn("google.com/maps/search", content)
+        self.assertEqual(marker_id({"content": content}), "782029")
+        self.assertTrue(is_generated_content(content))
+
+        self.match.time_known = False
+        self.assertIn("horaire à confirmer", event_payload(self.match, 9, 2, ["pierre albouy"])["content"])
+
+    def test_place_labels(self):
+        self.match.is_home = True
+        self.match.venue = "Salle Pierre ALBOUY, 68310 WITTELSHEIM"
+        self.assertEqual(place_label(self.match, ["pierre albouy"]), "Domicile")
+        self.match.venue = None
+        self.assertEqual(place_label(self.match, ["pierre albouy"]), "Domicile")
+        self.match.venue = "Gymnase du Grillenbreit, 68000 Colmar"
+        self.assertEqual(place_label(self.match, ["pierre albouy"]), "Reçoit à Colmar")
+        self.match.is_home = False
+        self.assertEqual(place_label(self.match, ["pierre albouy"]), "Extérieur")
+
+    def test_untouched_generated_pages_are_rewritten_and_edited_ones_kept(self):
+        legacy = ("<p><strong>Rencontre d’interclub</strong><br>Interclubs Comité 68 D3<br>"
+                  "📍 Salle Pierre ALBOUY, 68310 WITTELSHEIM</p>\n"
+                  '<p><a href="https://icbad.ffbad.org/rencontre/782029" title="CSBW_SYNC:782029">'
+                  "Voir la fiche ICbad</a></p>")
+        generated = event_payload(self.match, 9, 2, ["pierre albouy"])["content"]
+        edited = generated.replace("Voir la fiche ICbad", "Fiche ICbad (bus à 9h)")
+        for content, rewritten in ((legacy, True), (generated, True), (edited, False)):
+            session = Session([{**self.event, "content": content}])
+            self.sync(session)
+            self.assertEqual("content" in session.writes[0][2], rewritten, content[:40])
+
+    def test_rescheduled_generated_page_gets_the_new_date(self):
+        old = self.match.start
+        self.match.start = datetime.fromisoformat("2026-09-05T18:00:00+02:00")
+        stale = event_payload(self.match, 9, 2, ["pierre albouy"])["content"]
+        self.match.start = old
+        stored = {**self.synced_event({"all_day": False, "start_date": "2026-09-05", "start_time": "18:00:00"}),
+                  "content": stale}
+        session = Session([stored])
+        self.sync(session)
+        self.assertIn("4 septembre · 20h30", session.writes[0][2]["content"])
 
 
 if __name__ == "__main__":
