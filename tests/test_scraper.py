@@ -47,9 +47,10 @@ class ScraperTests(unittest.TestCase):
         self.assertEqual(len(article.matches), 3)
         self.assertEqual(article.title, "🏸 Interclubs de la semaine")
         self.assertIn("📍 Salle Pierre Albouy", article.content)
-        self.assertIn('📅 Vendredi 4 septembre : <span style="white-space:nowrap;">2 rencontres</span>', article.content)
-        self.assertIn('📅 Dimanche 6 septembre : <span style="white-space:nowrap;">1 rencontre</span>', article.content)
-        self.assertIn("🕒 <strong>20 h 30</strong>", article.content)
+        self.assertIn("3 rencontres à domicile", article.content)
+        self.assertRegex(article.content, r'>Vendredi 4 septembre<span[^>]*>2 rencontres</span>')
+        self.assertRegex(article.content, r'>Dimanche 6 septembre<span[^>]*>1 rencontre</span>')
+        self.assertRegex(article.content, r'>20h30</div>')
         self.assertIn("CSBW 1 reçoit Badminton Club Mulhouse", article.content)
         self.assertIn("CSBW 3 reçoit Colmar Badminton Racing", article.content)
         self.assertIn("CSBW 5 reçoit Sundgau Badminton", article.content)
@@ -251,7 +252,7 @@ class ScraperTests(unittest.TestCase):
             ["salle pierre albouy"],
         )
         self.assertTrue(article.should_create)
-        self.assertIn("🕒 <strong>Horaire à confirmer</strong>", article.content)
+        self.assertIn(">à confirmer</span>", article.content)
         self.assertEqual(event_payload(match, 9, 2, ["salle pierre albouy"])["location_id"], 2)
 
     def test_manual_override_updates_and_adds_matches(self) -> None:

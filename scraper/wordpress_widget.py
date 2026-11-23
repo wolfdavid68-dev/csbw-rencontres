@@ -20,11 +20,13 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 WIDGET_ID = "em_widget-10"
 FORMAT_FILE = PROJECT_ROOT / "templates" / "interclub-widget-format.html"
 # Scripts kept in the Interclub footer so every page with the sidebar runs them, instead of depending on
-# a post still being listed on the homepage: the "Événements" box and the cheese sale popup.
+# a post still being listed on the homepage: the "Événements" box, the cheese sale popup and the grouping
+# of the matches by day.
 # Deleting a template removes its block from the footer at the next --apply.
 MANAGED_BLOCKS = {
     "csbw-events-widget": PROJECT_ROOT / "templates" / "events-sidebar-widget.html",
     "csbw-fromage-popup": PROJECT_ROOT / "templates" / "fromage-popup.html",
+    "csbw-interclub-days": PROJECT_ROOT / "templates" / "interclub-widget-days.html",
 }
 # The whole Monday-to-Sunday week, so matches already played stay listed until Sunday.
 SCOPE = "week"

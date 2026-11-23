@@ -44,17 +44,24 @@ class WidgetTests(unittest.TestCase):
         self.assertEqual(footer, "</ul>\n\n" + events + "\n\n" + popup)
         self.assertEqual(with_block(footer, "csbw-fromage-popup", None), "</ul>\n\n" + events)
 
-    def test_away_matches_show_the_hall_or_exterieur(self):
+    def test_widget_shows_start_time_badge_and_hall(self):
         from scraper.wordpress_widget import FORMAT_FILE
         widget_format = FORMAT_FILE.read_text(encoding="utf-8")
-        self.assertIn("{no_location}🚗 {has_att_salle}#_ATT{salle}{/has_att_salle}"
-                      "{no_att_salle}Extérieur{/no_att_salle}{/no_location}", widget_format)
+        self.assertIn("{has_time}#_{G}h#_{i}{/has_time}", widget_format)
+        self.assertNotIn("#_EVENTTIMES", widget_format)  # The end time is a placeholder (start + 3 h).
+        self.assertIn(">Domicile</span>#_LOCATIONNAME{/has_location}", widget_format)
+        self.assertIn('>Extérieur</span>{has_att_salle}<span class="csbw-ic-salle">#_ATT{salle}</span>', widget_format)
+        self.assertIn('data-csbw-date="#_{Y-m-d}" data-csbw-title="#_EVENTNAME"', widget_format)
+        self.assertNotIn("\\", widget_format)
 
-    def test_popup_template_survives_the_widget_format(self):
+    def test_footer_scripts_survive_the_widget_format(self):
         # WordPress may strip backslashes and Events Manager reads "#x" as a placeholder: keep both out.
-        block = MANAGED_BLOCKS["csbw-fromage-popup"].read_text(encoding="utf-8")
-        script = block.split("<script>", 1)[1].split("</script>", 1)[0]
-        self.assertNotIn("\\", script)
-        self.assertNotIn("#", script)
-        self.assertNotIn("<", script)
-        self.assertEqual(len(script.splitlines()), 1)
+        for name in ("csbw-fromage-popup", "csbw-interclub-days"):
+            block = MANAGED_BLOCKS[name].read_text(encoding="utf-8")
+            script = block.split("<script>", 1)[1].split("</script>", 1)[0]
+            self.assertNotIn("\\", block, name)
+            self.assertNotIn("#", script, name)
+            self.assertNotIn("<", script, name)
+            self.assertEqual(len(script.splitlines()), 1, name)
+        style = MANAGED_BLOCKS["csbw-interclub-days"].read_text(encoding="utf-8").split("<style>", 1)[1]
+        self.assertNotIn("#", style.split("</style>", 1)[0])

@@ -154,33 +154,37 @@ def build_weekly_article(
     for match in selected:
         grouped.setdefault(match.start.date(), []).append(match)
 
+    total = len(selected)
+    total_text = "1 rencontre à domicile" if total == 1 else f"{total} rencontres à domicile"
     sections: list[str] = [
-        '<p style="font-size:17px;line-height:1.6;margin:0 0 6px;">'
-        f'<strong>{html.escape(week_label.capitalize())}</strong></p>',
-        '<p style="font-size:16px;line-height:1.6;margin:0 0 20px;">'
-        '📍 Salle Pierre Albouy</p>',
+        '<p style="font-size:15px;line-height:1.6;margin:0 0 16px;color:#666;">'
+        f'<strong style="color:#333;">{html.escape(week_label.capitalize())}</strong> · 📍 Salle Pierre Albouy<br>'
+        f"{total_text} : venez encourager les équipes !</p>",
     ]
     for day, matches in sorted(grouped.items()):
         count = len(matches)
         count_label = "1 rencontre" if count == 1 else f"{count} rencontres"
         day_label = format_day(day).capitalize()
-        sections.append(
-            '<h2 style="font-size:20px;font-weight:600;line-height:1.5;margin:22px 0 16px;'
-            'padding:0 0 12px;border-bottom:2px solid #d00000;">'
-            f'📅 {html.escape(day_label)} : <span style="white-space:nowrap;">{count_label}</span></h2>'
-        )
+        rows = []
         for match in matches:
-            time_label = match.start.strftime("%H h %M") if match.time_known else "Horaire à confirmer"
-            team = html.escape(match.team)
-            opponent = html.escape(match.opponent)
+            time_label = (f"{match.start.hour}h{match.start.minute:02d}" if match.time_known
+                          else '<span style="font-size:12px;font-style:italic;">à confirmer</span>')
             link = html.escape(match.source_url, quote=True)
-            sections.append(
-                '<p style="font-size:18px;line-height:1.8;margin:0 0 16px;overflow-wrap:anywhere;">'
-                f'🕒 <strong>{time_label}</strong><br>'
-                f'<a href="{link}" style="color:inherit;text-decoration:underline;'
-                'text-decoration-color:#d00000;text-underline-offset:4px;">'
-                f'<strong>{team} reçoit {opponent}</strong></a></p>'
+            rows.append(
+                '<div style="display:flex;gap:12px;align-items:center;padding:10px 12px;border-top:1px solid #eee;">'
+                f'<div style="flex:none;min-width:46px;font-size:15px;font-weight:700;color:#d70100;">{time_label}</div>'
+                f'<div style="min-width:0;overflow-wrap:anywhere;"><a href="{link}" style="color:#222;text-decoration:none;'
+                f'font-size:15px;font-weight:700;line-height:1.3;">{html.escape(match.team)} reçoit '
+                f'{html.escape(match.opponent)}</a><br><span style="font-size:12px;color:#888;">'
+                f"{html.escape(match.division)}</span></div></div>"
             )
+        sections.append(
+            '<div style="margin:0 0 12px;border:1px solid #e6e6e6;border-left:4px solid #d70100;border-radius:3px;">'
+            '<div style="display:flex;justify-content:space-between;gap:8px;padding:8px 12px;background:#fafafa;'
+            f'font-size:15px;font-weight:700;">{html.escape(day_label)}'
+            f'<span style="font-size:12.5px;font-weight:400;color:#888;white-space:nowrap;">{count_label}</span></div>'
+            + "".join(rows) + "</div>"
+        )
 
     total_label = "Un interclub est prévu" if len(selected) == 1 else f"{len(selected)} interclubs sont prévus"
     excerpt = f"{total_label} à la salle Pierre Albouy pendant la semaine {week_label}."
