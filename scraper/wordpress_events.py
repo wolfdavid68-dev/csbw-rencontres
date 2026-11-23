@@ -95,6 +95,19 @@ def venue_town(venue: str | None) -> str:
     return town.title() if town.isupper() or town.islower() else town
 
 
+def display_venue(venue: str) -> str:
+    """Full address with a readable town: "CSL - Quai Heydt, 67540 ostwald" -> "CSL - Quai Heydt, 67540 Ostwald"."""
+    name, comma, place = venue.rpartition(",")
+    if not comma:
+        return venue
+    place = place.strip()
+    found = re.match(r"^(\d{5}\s*)?(.*)$", place)
+    town = found.group(2)
+    if town.isupper() or town.islower():
+        town = town.title()
+    return f"{name.strip()}, {found.group(1) or ''}{town}"
+
+
 def is_home_hall(match: Match, home_venue_patterns: list[str]) -> bool:
     """Played in the club's own hall (a home match without a venue yet is played there)."""
     venue = (match.venue or "").casefold()
@@ -139,7 +152,7 @@ def event_content_html(match: Match, home_venue_patterns: list[str]) -> str:
         "Extérieur": "background:#e8e8e8;color:#555;",
     }.get(place, "background:#fff1d6;color:#8a5a00;")
     round_label = f" · J{match.round_number}" if match.round_number else ""
-    venue = e(match.venue) if match.venue else UNKNOWN_VENUE
+    venue = e(display_venue(match.venue)) if match.venue else UNKNOWN_VENUE
     source_url = e(match.source_url, quote=True)
     button = ("display:inline-block;margin:0 6px 8px 0;padding:10px 14px;border-radius:3px;"
               "font-weight:500;text-decoration:none;text-transform:uppercase;font-size:13px;")

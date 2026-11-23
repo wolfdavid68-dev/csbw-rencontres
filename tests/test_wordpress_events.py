@@ -3,7 +3,7 @@ import unittest
 
 from scraper.demo import build_demo_result
 from scraper.wordpress_events import (
-    event_payload, is_generated_content, marker_id, place_label, short_venue, sync_events_manager_week,
+    display_venue, event_payload, is_generated_content, marker_id, place_label, short_venue, sync_events_manager_week,
 )
 
 
@@ -198,12 +198,18 @@ class EventSyncTests(unittest.TestCase):
         self.assertIn("4 septembre · 20h30", content)
         self.assertIn(f"{self.match.team} <span", content)
         self.assertIn("Reçoit à Ostwald", content)
+        self.assertIn("CSL - Quai Heydt - Ostwald, 67540 Ostwald", content)
         self.assertIn("google.com/maps/search", content)
         self.assertEqual(marker_id({"content": content}), "782029")
         self.assertTrue(is_generated_content(content))
 
         self.match.time_known = False
         self.assertIn("horaire à confirmer", event_payload(self.match, 9, 2, ["pierre albouy"])["content"])
+
+    def test_display_venue_capitalizes_the_town(self):
+        self.assertEqual(display_venue("Salle Pierre ALBOUY, 68310 WITTELSHEIM"), "Salle Pierre ALBOUY, 68310 Wittelsheim")
+        self.assertEqual(display_venue("Gymnase du Grillenbreit, 68000 Colmar"), "Gymnase du Grillenbreit, 68000 Colmar")
+        self.assertEqual(display_venue("Gymnase Kléber"), "Gymnase Kléber")
 
     def test_place_labels(self):
         self.match.is_home = True
