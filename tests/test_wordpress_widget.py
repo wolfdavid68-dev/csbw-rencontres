@@ -1,7 +1,7 @@
 import unittest
 from urllib.parse import parse_qs
 
-from scraper.wordpress_widget import form_data, php_unserialize, widget_summary, with_block, MANAGED_BLOCKS
+from scraper.wordpress_widget import MANAGED_BLOCKS, form_data, php_unserialize, widget_summary, with_block, with_managed_blocks
 
 
 class WidgetTests(unittest.TestCase):
@@ -58,12 +58,23 @@ class WidgetTests(unittest.TestCase):
 
     def test_footer_scripts_survive_the_widget_format(self):
         # WordPress may strip backslashes and Events Manager reads "#x" as a placeholder: keep both out.
-        for name in ("csbw-fromage-popup", "csbw-interclub-days"):
+        for name in ("csbw-fromage-popup", "csbw-interclub-days", "csbw-mobile-tabs"):
             block = MANAGED_BLOCKS[name].read_text(encoding="utf-8")
             script = block.split("<script>", 1)[1].split("</script>", 1)[0]
             self.assertNotIn("\\", block, name)
             self.assertNotIn("#", script, name)
             self.assertNotIn("<", script, name)
             self.assertEqual(len(script.splitlines()), 1, name)
-        style = MANAGED_BLOCKS["csbw-interclub-days"].read_text(encoding="utf-8").split("<style>", 1)[1]
-        self.assertNotIn("#", style.split("</style>", 1)[0])
+        for name in ("csbw-interclub-days", "csbw-mobile-tabs"):
+            style = MANAGED_BLOCKS[name].read_text(encoding="utf-8").split("<style>", 1)[1]
+            self.assertNotIn("#", style.split("</style>", 1)[0], name)
+            self.assertNotIn("\n", style.split("</style>", 1)[0], name)
+
+    def test_grey_mobile_panels_are_replaced_by_the_tabs(self):
+        legacy = ('<style id="csbw-mobile-agenda-style">\n.a{}\n</style>\n'
+                  '<script id="csbw-mobile-agenda-script">\n(function(){})();\n</script>')
+        footer = with_managed_blocks("</ul>\n<script>tri</script>\n" + legacy)
+        self.assertNotIn("csbw-mobile-agenda", footer)
+        self.assertTrue(footer.startswith("</ul>\n<script>tri</script>"))
+        self.assertEqual(footer.count("csbw-mobile-tabs:start"), 1)
+        self.assertEqual(with_managed_blocks(footer), footer)
